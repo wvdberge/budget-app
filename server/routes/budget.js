@@ -114,9 +114,22 @@ router.post('/:profileId/:month/copy-targets', (req, res) => {
   if (m < 1) { m = 12; y--; }
   const prevMonth = `${y}-${String(m).padStart(2, '0')}`;
 
-  const prevTargets = db.prepare(
+  // Use effective target from previous month: month-specific override if set, else category default
+  const categoryDefaults = db.prepare(
+    'SELECT id as category_id, monthly_target as target FROM categories WHERE profile_id = ?'
+  ).all(profileId);
+
+  const prevOverrides = db.prepare(
     'SELECT category_id, target FROM month_budgets WHERE profile_id = ? AND month = ?'
   ).all(profileId, prevMonth);
+
+  const overrideMap = {};
+  for (const r of prevOverrides) overrideMap[r.category_id] = r.target;
+
+  const effectiveTargets = categoryDefaults.map(c => ({
+    category_id: c.category_id,
+    target: overrideMap[c.category_id] ?? c.target,
+  }));
 
   const upsert = db.prepare(`
     INSERT INTO month_budgets (profile_id, category_id, month, target)
@@ -125,11 +138,11 @@ router.post('/:profileId/:month/copy-targets', (req, res) => {
   `);
 
   const insertMany = db.transaction(() => {
-    for (const r of prevTargets) upsert.run(profileId, r.category_id, month, r.target);
+    for (const r of effectiveTargets) upsert.run(profileId, r.category_id, month, r.target);
   });
   insertMany();
 
-  res.json({ copied: prevTargets.length });
+  res.json({ copied: effectiveTargets.length });
 });
 
 module.exports = router;

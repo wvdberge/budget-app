@@ -8,6 +8,7 @@ export default function BudgetView() {
   const [budget, setBudget] = useState(null);
   const [loading, setLoading]   = useState(false);
   const [editingTarget, setEditingTarget] = useState(null); // { categoryId, value }
+  const [feedback, setFeedback] = useState('');
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -18,15 +19,21 @@ export default function BudgetView() {
       .finally(() => setLoading(false));
   }, [profileId, month]);
 
+  function showFeedback(msg) {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(''), 3000);
+  }
+
   async function applyRecurring() {
-    await api.budget.applyRecurring(profileId, month);
-    // Refresh
+    const { created } = await api.budget.applyRecurring(profileId, month);
     api.budget.get(profileId, month).then(setBudget);
+    showFeedback(created > 0 ? `${created} terugkerende transactie(s) toegevoegd.` : 'Geen terugkerende transacties gevonden in de vorige maand.');
   }
 
   async function copyTargets() {
-    await api.budget.copyTargets(profileId, month);
+    const { copied } = await api.budget.copyTargets(profileId, month);
     api.budget.get(profileId, month).then(setBudget);
+    showFeedback(copied > 0 ? `${copied} doelen gekopieerd.` : 'Geen doelen om te kopiëren.');
   }
 
   function startEditTarget(categoryId, currentTarget) {
@@ -65,6 +72,7 @@ export default function BudgetView() {
       <div className="tx-toolbar" style={{ marginBottom: 14 }}>
         <button className="btn btn-sm" onClick={copyTargets} title="Kopieer budgetten van vorige maand">Doelen kopiëren</button>
         <button className="btn btn-sm" onClick={applyRecurring} title="Voeg terugkerende transacties toe voor deze maand">Terugkerend toevoegen</button>
+        {feedback && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{feedback}</span>}
       </div>
 
       {!hasCategories ? (
