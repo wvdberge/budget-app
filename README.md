@@ -62,31 +62,35 @@ The app stores all data in a single SQLite file. You need to create a dedicated 
 
 You should now have the path `volume1/docker/budget/data`. This is where the database file will be stored.
 
-### Step 3 — Copy the app files to your NAS
+### Step 3 — Get the app files onto your NAS
 
-You need to get the app files onto your NAS. The easiest way is via File Station.
+Enable SSH on your NAS: **DSM → Control Panel → Terminal & SNMP → Enable SSH service**.
 
-1. On your computer, download or copy the entire `budget` app folder.
-2. Open **File Station** on your NAS.
-3. Navigate to `docker/budget/`.
-4. Click the **Upload** button at the top and upload all the app files (everything except the `data` folder — that stays empty for now).
+Then open a terminal on your computer and connect:
 
-Alternatively, if your NAS has the **Git** package installed, you can clone the repository directly into `docker/budget/`.
+```bash
+ssh your-username@your-nas-ip
+```
 
-### Step 4 — Create the Container Manager project
+Clone the repository directly into the docker folder:
 
-1. Open **Container Manager** from the DSM desktop.
-2. In the left panel, click on **Project**.
-3. Click the **Create** button at the top.
-4. Fill in the form:
-   - **Project name:** `budget`
-   - **Path:** click **Set Path** and navigate to `docker/budget` — select that folder.
-   - Container Manager will automatically detect the `docker-compose.yml` file inside.
-5. Click **Next**.
-6. On the next screen, you will see a preview of the compose configuration. Do not change anything.
-7. Click **Next**, then **Done**.
+```bash
+cd /volume1/docker
+git clone https://github.com/wvdberge/budget-app.git
+```
 
-Container Manager will now build the app (this takes a few minutes the first time — it is downloading and compiling everything). You can watch the progress in the **Logs** tab.
+This creates `/volume1/docker/budget-app/` with all the app files.
+
+### Step 4 — Build and start the app
+
+Still in the SSH session, run:
+
+```bash
+cd /volume1/docker/budget-app
+sudo docker compose up -d --build
+```
+
+This builds and starts the app. The first build takes a few minutes. When it finishes you will see `Started` in the output.
 
 ### Step 5 — Access the app
 
@@ -102,22 +106,22 @@ To find your NAS IP address: open DSM → click on your username (top right) →
 
 ## Backing up the database
 
-All your data lives in a single file: `volume1/docker/budget/data/budget.db`.
+All your data lives in a single file: `volume1/docker/budget-app/data/budget.db`.
 
 **To back it up:**
 
 1. Open **File Station**.
-2. Navigate to `docker/budget/data/`.
+2. Navigate to `docker/budget-app/data/`.
 3. Right-click on `budget.db` → **Download**.
 
 This saves a copy to your computer. Do this regularly, or set up Hyper Backup to include this folder in your existing backup schedule.
 
 **To restore from backup:**
 
-1. Stop the Budget project in Container Manager (select the project → **Action** → **Stop**).
-2. In File Station, navigate to `docker/budget/data/` and delete or rename the existing `budget.db`.
+1. SSH into your NAS and run: `sudo docker compose -f /volume1/docker/budget-app/docker-compose.yml stop`
+2. In File Station, navigate to `docker/budget-app/data/` and delete or rename the existing `budget.db`.
 3. Upload your backup file and name it `budget.db`.
-4. Start the project again in Container Manager.
+4. SSH in again and run: `sudo docker compose -f /volume1/docker/budget-app/docker-compose.yml start`
 
 ---
 
@@ -125,12 +129,15 @@ This saves a copy to your computer. Do this regularly, or set up Hyper Backup to
 
 Updating replaces the app code but never touches the `data/` folder, so your database is safe.
 
-1. In **Container Manager**, select the `budget` project → **Action** → **Stop**. Wait until it stops.
-2. In **File Station**, open `docker/budget/`. Delete all files and folders **except the `data/` folder**.
-3. Upload the new version's files into `docker/budget/` (same as Step 3 above).
-4. In **Container Manager**, select the `budget` project → **Action** → **Build**. This rebuilds the app with the new code.
-5. Once the build finishes, click **Action** → **Start**.
-6. Refresh your browser. You are now on the new version.
+SSH into your NAS and run:
+
+```bash
+cd /volume1/docker/budget-app
+git pull
+sudo docker compose up -d --build
+```
+
+That's it. Refresh your browser and you're on the new version.
 
 ---
 
