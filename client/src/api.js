@@ -55,6 +55,10 @@ export const api = {
     delete: (id)               => req('DELETE', `/api/transactions/${id}`),
   },
 
+  transfers: {
+    create: (t) => req('POST', '/api/transfers', t),
+  },
+
   import: {
     parse: (bank, file) => {
       const form = new FormData();

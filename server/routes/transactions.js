@@ -62,8 +62,12 @@ router.put('/:id', (req, res) => {
 
 // DELETE /api/transactions/:id
 router.delete('/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM transactions WHERE id = ?').run(req.params.id);
-  if (info.changes === 0) return res.status(404).json({ error: 'not found' });
+  const tx = db.prepare('SELECT is_transfer, transfer_peer_id FROM transactions WHERE id = ?').get(req.params.id);
+  if (!tx) return res.status(404).json({ error: 'not found' });
+  if (tx.is_transfer && tx.transfer_peer_id) {
+    db.prepare('DELETE FROM transactions WHERE id = ?').run(tx.transfer_peer_id);
+  }
+  db.prepare('DELETE FROM transactions WHERE id = ?').run(req.params.id);
   res.status(204).end();
 });
 

@@ -10,6 +10,8 @@ db.pragma('foreign_keys = ON');
 
 // Migrations
 try { db.exec(`ALTER TABLE accounts ADD COLUMN initial_balance REAL NOT NULL DEFAULT 0`); } catch (_) {}
+try { db.exec(`ALTER TABLE transactions ADD COLUMN is_transfer INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
+try { db.exec(`ALTER TABLE transactions ADD COLUMN transfer_peer_id INTEGER REFERENCES transactions(id)`); } catch (_) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS profiles (
@@ -132,7 +134,7 @@ function computeForMonths(profileId, months, rollover, categories) {
     const spentRows = db.prepare(`
       SELECT category_id, SUM(amount) as total
       FROM transactions
-      WHERE profile_id = ? AND substr(date,1,7) = ? AND amount < 0
+      WHERE profile_id = ? AND substr(date,1,7) = ? AND amount < 0 AND is_transfer = 0
       GROUP BY category_id
     `).all(profileId, m);
     const spentMap = {};

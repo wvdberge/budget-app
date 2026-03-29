@@ -7,8 +7,10 @@ A personal budgeting app for private home use. Runs on your Synology NAS, access
 - Two-level categories: groups → subcategories with monthly targets
 - YNAB-style rollover: unspent amounts carry forward each month
 - Transactions with manual entry and CSV import (ABN AMRO, ASN Bank)
+- Budget-neutral transfers between accounts (both legs created atomically, excluded from budget)
 - Recurring transactions that pre-fill each month
 - Per-month budget overview: target / spent / available per category
+- Account balances: set an initial balance per account; current balance updates automatically
 - Dark mode, works on desktop and mobile
 
 **Not included:** login, authentication, cloud sync — this is a private LAN-only app.

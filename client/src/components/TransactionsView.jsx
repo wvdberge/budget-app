@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { formatAmount, formatDate } from '../format.js';
 import TransactionModal from './modals/TransactionModal.jsx';
 import ImportModal from './modals/ImportModal.jsx';
+import TransferModal from './modals/TransferModal.jsx';
 
 export default function TransactionsView() {
   const { profileId, month } = useContext(AppContext);
@@ -13,6 +14,7 @@ export default function TransactionsView() {
   const [loading, setLoading]           = useState(false);
   const [editTx, setEditTx]             = useState(null);   // null = closed, {} = new, tx = edit
   const [showImport, setShowImport]     = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
 
   function load() {
     if (!profileId) return;
@@ -30,8 +32,9 @@ export default function TransactionsView() {
 
   useEffect(load, [profileId, month]);
 
-  async function deleteTx(id) {
-    if (!confirm('Transactie verwijderen?')) return;
+  async function deleteTx(id, isTransfer) {
+    const msg = isTransfer ? 'Overboeking verwijderen? Beide boekingen worden verwijderd.' : 'Transactie verwijderen?';
+    if (!confirm(msg)) return;
     await api.transactions.delete(id);
     load();
   }
@@ -42,6 +45,7 @@ export default function TransactionsView() {
     <div>
       <div className="tx-toolbar">
         <button className="btn btn-primary btn-sm" onClick={() => setEditTx({})}>+ Transactie</button>
+        <button className="btn btn-sm" onClick={() => setShowTransfer(true)}>↔ Overboeking</button>
         <button className="btn btn-sm" onClick={() => setShowImport(true)}>CSV importeren</button>
         <span className="spacer" />
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
@@ -70,6 +74,7 @@ export default function TransactionsView() {
                 <td>
                   {tx.description || <span style={{ color: 'var(--text-faint)' }}>—</span>}
                   {tx.is_recurring ? <span className="recurring-badge">↻</span> : null}
+                  {tx.is_transfer  ? <span className="recurring-badge">↔</span> : null}
                 </td>
                 <td style={{ color: 'var(--text-muted)' }}>{tx.account_name}</td>
                 <td style={{ color: 'var(--text-muted)' }}>
@@ -79,8 +84,8 @@ export default function TransactionsView() {
                   {formatAmount(tx.amount)}
                 </td>
                 <td style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                  <button className="icon-btn" title="Bewerken" onClick={() => setEditTx(tx)}>✎</button>
-                  <button className="icon-btn" title="Verwijderen" onClick={() => deleteTx(tx.id)}>✕</button>
+                  {!tx.is_transfer && <button className="icon-btn" title="Bewerken" onClick={() => setEditTx(tx)}>✎</button>}
+                  <button className="icon-btn" title="Verwijderen" onClick={() => deleteTx(tx.id, tx.is_transfer)}>✕</button>
                 </td>
               </tr>
             ))}
@@ -106,6 +111,16 @@ export default function TransactionsView() {
           accounts={accounts}
           categories={categories}
           onClose={() => setShowImport(false)}
+          onSaved={load}
+        />
+      )}
+
+      {showTransfer && (
+        <TransferModal
+          profileId={profileId}
+          accounts={accounts}
+          month={month}
+          onClose={() => setShowTransfer(false)}
           onSaved={load}
         />
       )}

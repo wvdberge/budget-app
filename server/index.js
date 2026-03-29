@@ -15,6 +15,7 @@ app.use('/api/groups',       require('./routes/groups'));
 app.use('/api/categories',   require('./routes/categories'));
 app.use('/api/budget',       require('./routes/budget'));
 app.use('/api/transactions', require('./routes/transactions'));
+app.use('/api/transfers',    require('./routes/transfers'));
 app.use('/api/import',       require('./routes/import'));
 
 // SPA fallback
