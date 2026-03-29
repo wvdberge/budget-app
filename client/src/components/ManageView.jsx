@@ -94,11 +94,16 @@ export default function ManageView() {
   }
 
   // ── Accounts ─────────────────────────────────────────────────────────────
-  async function addAccount(name) {
-    await api.accounts.create(profileId, name);
+  async function addAccount(name, initialBalanceStr) {
+    const initial_balance = parseFloat(String(initialBalanceStr).replace(',', '.')) || 0;
+    await api.accounts.create(profileId, name, initial_balance);
     load();
   }
-  async function updateAccount(id, name) { await api.accounts.update(id, name); load(); }
+  async function updateAccount(id, name, initial_balance) { await api.accounts.update(id, name, initial_balance); load(); }
+  async function updateAccountBalance(id, balanceStr, name) {
+    const initial_balance = parseFloat(String(balanceStr).replace(',', '.'));
+    if (!isNaN(initial_balance)) { await api.accounts.update(id, name, initial_balance); load(); }
+  }
   async function deleteAccount(id) {
     if (!confirm('Rekening verwijderen?')) return;
     await api.accounts.delete(id);
@@ -163,10 +168,19 @@ export default function ManageView() {
         <h3>Rekeningen</h3>
         <ul className="manage-list">
           {accounts.map(a => (
-            <EditableItem key={a.id} name={a.name} onSave={n => updateAccount(a.id, n)} onDelete={() => deleteAccount(a.id)} />
+            <EditableItem key={a.id} name={a.name} onSave={n => updateAccount(a.id, n, a.initial_balance)} onDelete={() => deleteAccount(a.id)}>
+              <TargetEditor
+                value={a.initial_balance}
+                onSave={v => updateAccountBalance(a.id, v, a.name)}
+                title="Beginsaldo"
+              />
+              <span className="manage-item-sub" style={{ marginRight: 4, color: a.current_balance >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
+                {formatAmount(a.current_balance)}
+              </span>
+            </EditableItem>
           ))}
         </ul>
-        <AddForm placeholder="Nieuwe rekening" onAdd={addAccount} />
+        <AddForm placeholder="Nieuwe rekening" extraField="Beginsaldo (€)" onAdd={addAccount} />
       </div>
 
       {/* Category groups + categories — full width */}
@@ -222,7 +236,7 @@ export default function ManageView() {
   );
 }
 
-function TargetEditor({ value, onSave }) {
+function TargetEditor({ value, onSave, title = 'Klik om standaard doel te bewerken' }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal]         = useState('');
 
@@ -252,7 +266,7 @@ function TargetEditor({ value, onSave }) {
       className="manage-item-sub"
       style={{ cursor: 'pointer', marginRight: 4 }}
       onClick={start}
-      title="Klik om standaard doel te bewerken"
+      title={title}
     >
       {formatAmount(value)}
     </span>

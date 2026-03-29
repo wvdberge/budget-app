@@ -21,10 +21,10 @@ export const api = {
   },
 
   accounts: {
-    list:   (profileId)        => req('GET',    `/api/accounts?profileId=${profileId}`),
-    create: (profileId, name)  => req('POST',   '/api/accounts', { profileId, name }),
-    update: (id, name)         => req('PUT',    `/api/accounts/${id}`, { name }),
-    delete: (id)               => req('DELETE', `/api/accounts/${id}`),
+    list:   (profileId)                          => req('GET',    `/api/accounts?profileId=${profileId}`),
+    create: (profileId, name, initial_balance)   => req('POST',   '/api/accounts', { profileId, name, initial_balance }),
+    update: (id, name, initial_balance)          => req('PUT',    `/api/accounts/${id}`, { name, initial_balance }),
+    delete: (id)                                 => req('DELETE', `/api/accounts/${id}`),
   },
 
   groups: {

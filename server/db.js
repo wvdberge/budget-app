@@ -8,6 +8,9 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+// Migrations
+try { db.exec(`ALTER TABLE accounts ADD COLUMN initial_balance REAL NOT NULL DEFAULT 0`); } catch (_) {}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS profiles (
     id   INTEGER PRIMARY KEY AUTOINCREMENT,
