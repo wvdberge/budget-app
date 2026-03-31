@@ -18,6 +18,21 @@ router.get('/:profileId/:month', (req, res) => {
 
   const budgetMap = computeBudget(Number(profileId), month);
 
+  // Income groups: sum positive transactions in income categories for this month
+  const incomeGroupIds = new Set(groups.filter(g => g.is_income).map(g => g.id));
+  const incomeCategoryIds = categories.filter(c => incomeGroupIds.has(c.group_id)).map(c => c.id);
+  let totalIncome = 0;
+  if (incomeCategoryIds.length > 0) {
+    const placeholders = incomeCategoryIds.map(() => '?').join(',');
+    const incomeRow = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM transactions
+      WHERE profile_id = ? AND substr(date,1,7) = ? AND amount > 0 AND is_transfer = 0
+        AND category_id IN (${placeholders})
+    `).get(profileId, month, ...incomeCategoryIds);
+    totalIncome = incomeRow.total;
+  }
+
   const groupMap = {};
   for (const g of groups) groupMap[g.id] = { ...g, categories: [] };
 
@@ -29,6 +44,7 @@ router.get('/:profileId/:month', (req, res) => {
 
   res.json({
     month,
+    totalIncome,
     groups: groups.map(g => groupMap[g.id]),
   });
 });

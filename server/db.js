@@ -12,6 +12,7 @@ db.pragma('foreign_keys = ON');
 try { db.exec(`ALTER TABLE accounts ADD COLUMN initial_balance REAL NOT NULL DEFAULT 0`); } catch (_) {}
 try { db.exec(`ALTER TABLE transactions ADD COLUMN is_transfer INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
 try { db.exec(`ALTER TABLE transactions ADD COLUMN transfer_peer_id INTEGER REFERENCES transactions(id)`); } catch (_) {}
+try { db.exec(`ALTER TABLE category_groups ADD COLUMN is_income INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS profiles (
@@ -130,15 +131,15 @@ function computeForMonths(profileId, months, rollover, categories) {
     const targetMap = {};
     for (const r of budgetRows) targetMap[r.category_id] = r.target;
 
-    // Fetch all spending for this month in one query
+    // Fetch net spending for this month in one query (positive amounts = refunds, reduce spent)
     const spentRows = db.prepare(`
       SELECT category_id, SUM(amount) as total
       FROM transactions
-      WHERE profile_id = ? AND substr(date,1,7) = ? AND amount < 0 AND is_transfer = 0
+      WHERE profile_id = ? AND substr(date,1,7) = ? AND is_transfer = 0
       GROUP BY category_id
     `).all(profileId, m);
     const spentMap = {};
-    for (const r of spentRows) spentMap[r.category_id] = Math.abs(r.total);
+    for (const r of spentRows) spentMap[r.category_id] = -r.total;
 
     for (const c of categories) {
       const target = targetMap[c.id] ?? c.monthly_target ?? 0;

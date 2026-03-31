@@ -28,10 +28,10 @@ export const api = {
   },
 
   groups: {
-    list:   (profileId)                    => req('GET',    `/api/groups?profileId=${profileId}`),
-    create: (profileId, name, sort_order)  => req('POST',   '/api/groups', { profileId, name, sort_order }),
-    update: (id, name, sort_order)         => req('PUT',    `/api/groups/${id}`, { name, sort_order }),
-    delete: (id)                           => req('DELETE', `/api/groups/${id}`),
+    list:   (profileId)                               => req('GET',    `/api/groups?profileId=${profileId}`),
+    create: (profileId, name, sort_order, is_income)  => req('POST',   '/api/groups', { profileId, name, sort_order, is_income }),
+    update: (id, name, sort_order, is_income)         => req('PUT',    `/api/groups/${id}`, { name, sort_order, is_income }),
+    delete: (id)                                      => req('DELETE', `/api/groups/${id}`),
   },
 
   categories: {

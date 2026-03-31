@@ -111,11 +111,11 @@ export default function ManageView() {
   }
 
   // ── Groups ───────────────────────────────────────────────────────────────
-  async function addGroup(name) {
-    await api.groups.create(profileId, name, groups.length);
+  async function addGroup(name, isIncome) {
+    await api.groups.create(profileId, name, groups.length, isIncome);
     load();
   }
-  async function updateGroup(id, name) { await api.groups.update(id, name); load(); }
+  async function updateGroup(id, name, isIncome) { await api.groups.update(id, name, undefined, isIncome); load(); }
   async function deleteGroup(id) {
     if (!confirm('Groep en alle bijbehorende categorieën verwijderen?')) return;
     await api.groups.delete(id);
@@ -200,9 +200,18 @@ export default function ManageView() {
               <div className="group-header-full">
                 <EditableItem
                   name={g.name}
-                  onSave={n => updateGroup(g.id, n)}
+                  onSave={n => updateGroup(g.id, n, !!g.is_income)}
                   onDelete={() => deleteGroup(g.id)}
-                />
+                >
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', marginRight: 4 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!g.is_income}
+                      onChange={e => updateGroup(g.id, g.name, e.target.checked)}
+                    />
+                    Inkomen
+                  </label>
+                </EditableItem>
               </div>
               <ul className="manage-list" style={{ paddingLeft: 16 }}>
                 {groupCats.map(c => (
@@ -228,11 +237,35 @@ export default function ManageView() {
         })}
 
         <div style={{ marginTop: 12 }}>
-          <AddForm placeholder="Nieuwe groep" onAdd={addGroup} />
+          <GroupAddForm onAdd={addGroup} />
         </div>
       </div>
 
     </div>
+  );
+}
+
+function GroupAddForm({ onAdd }) {
+  const [name, setName]         = useState('');
+  const [isIncome, setIsIncome] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    await onAdd(name.trim(), isIncome);
+    setName('');
+    setIsIncome(false);
+  }
+
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Nieuwe groep" style={{ flex: 1 }} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        <input type="checkbox" checked={isIncome} onChange={e => setIsIncome(e.target.checked)} />
+        Inkomen
+      </label>
+      <button type="submit" className="btn btn-sm btn-primary">+</button>
+    </form>
   );
 }
 

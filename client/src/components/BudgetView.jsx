@@ -60,8 +60,8 @@ export default function BudgetView() {
 
   const hasCategories = budget.groups.some(g => g.categories.length > 0);
 
-  // Totals
-  const allCats = budget.groups.flatMap(g => g.categories);
+  // Totals (exclude income groups from budget table totals)
+  const allCats = budget.groups.filter(g => !g.is_income).flatMap(g => g.categories);
   const totalTarget    = allCats.reduce((s, c) => s + c.target, 0);
   const totalSpent     = allCats.reduce((s, c) => s + c.spent, 0);
   const totalAvailable = allCats.reduce((s, c) => s + c.available, 0);
@@ -74,6 +74,14 @@ export default function BudgetView() {
         <button className="btn btn-sm" onClick={applyRecurring} title="Voeg terugkerende transacties toe voor deze maand">Terugkerend toevoegen</button>
         {feedback && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{feedback}</span>}
       </div>
+
+      {/* Income summary */}
+      {budget.totalIncome > 0 && (
+        <div style={{ marginBottom: 14, padding: '10px 12px', background: 'var(--positive-bg, #e8f5e9)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>Inkomen deze maand</span>
+          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--positive)' }}>{formatAmount(budget.totalIncome)}</span>
+        </div>
+      )}
 
       {!hasCategories ? (
         <div className="empty-state">Nog geen categorieën. Ga naar Beheer om categorieën aan te maken.</div>
