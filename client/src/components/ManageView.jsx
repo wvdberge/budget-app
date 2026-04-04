@@ -366,7 +366,6 @@ function RuleAddForm({ categories, onAdd }) {
   );
 }
 
->>>>>>> 9ac2ee0 (feat: recurring frequency, category rules, income tracking)
 function TargetEditor({ value, onSave, title = 'Klik om standaard doel te bewerken' }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal]         = useState('');
