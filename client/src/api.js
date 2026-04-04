@@ -35,10 +35,10 @@ export const api = {
   },
 
   categories: {
-    list:   (profileId, groupId)                          => req('GET',    `/api/categories?profileId=${profileId}${groupId ? `&groupId=${groupId}` : ''}`),
-    create: (profileId, groupId, name, monthly_target)    => req('POST',   '/api/categories', { profileId, groupId, name, monthly_target }),
-    update: (id, fields)                                  => req('PUT',    `/api/categories/${id}`, fields),
-    delete: (id)                                          => req('DELETE', `/api/categories/${id}`),
+    list:   (profileId, groupId)                                      => req('GET',    `/api/categories?profileId=${profileId}${groupId ? `&groupId=${groupId}` : ''}`),
+    create: (profileId, groupId, name, monthly_target, is_income)     => req('POST',   '/api/categories', { profileId, groupId, name, monthly_target, is_income }),
+    update: (id, fields)                                              => req('PUT',    `/api/categories/${id}`, fields),
+    delete: (id)                                                      => req('DELETE', `/api/categories/${id}`),
   },
 
   budget: {
@@ -68,5 +68,11 @@ export const api = {
     },
     save: (profileId, accountId, transactions) =>
       req('POST', '/api/import/save', { profileId, accountId, transactions }),
+  },
+
+  rules: {
+    list:   (profileId)                    => req('GET',    `/api/rules?profileId=${profileId}`),
+    create: (profileId, keyword, categoryId) => req('POST', '/api/rules', { profileId, keyword, categoryId }),
+    delete: (id)                           => req('DELETE', `/api/rules/${id}`),
   },
 };

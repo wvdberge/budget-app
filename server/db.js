@@ -13,6 +13,8 @@ try { db.exec(`ALTER TABLE accounts ADD COLUMN initial_balance REAL NOT NULL DEF
 try { db.exec(`ALTER TABLE transactions ADD COLUMN is_transfer INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
 try { db.exec(`ALTER TABLE transactions ADD COLUMN transfer_peer_id INTEGER REFERENCES transactions(id)`); } catch (_) {}
 try { db.exec(`ALTER TABLE category_groups ADD COLUMN is_income INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
+try { db.exec(`ALTER TABLE transactions ADD COLUMN recurring_frequency TEXT NOT NULL DEFAULT 'monthly'`); } catch (_) {}
+try { db.exec(`ALTER TABLE categories ADD COLUMN is_income INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS profiles (
@@ -62,6 +64,14 @@ db.exec(`
     is_recurring        INTEGER NOT NULL DEFAULT 0,
     recurring_anchor_id INTEGER REFERENCES transactions(id)
   );
+
+  CREATE TABLE IF NOT EXISTS category_rules (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    keyword     TEXT NOT NULL,
+    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    UNIQUE(profile_id, keyword)
+  );
 `);
 
 // ── Rollover helpers ─────────────────────────────────────────────────────────
@@ -96,12 +106,43 @@ function earliestMonth(profileId) {
   return candidates.length ? candidates.reduce((a, b) => (a < b ? a : b)) : null;
 }
 
-// Computes available (rollover + target - spent) for every category for a given month.
+// Returns income categories with their target and amount received for a given month.
+function computeIncome(profileId, month) {
+  const incomeCategories = db.prepare(
+    'SELECT id, name, monthly_target FROM categories WHERE profile_id = ? AND is_income = 1'
+  ).all(profileId);
+
+  if (!incomeCategories.length) return [];
+
+  const receivedRows = db.prepare(`
+    SELECT category_id, SUM(amount) as total
+    FROM transactions
+    WHERE profile_id = ? AND substr(date,1,7) = ? AND amount > 0 AND is_transfer = 0
+    GROUP BY category_id
+  `).all(profileId, month);
+  const receivedMap = {};
+  for (const r of receivedRows) receivedMap[r.category_id] = r.total;
+
+  const overrideRows = db.prepare(
+    'SELECT category_id, target FROM month_budgets WHERE profile_id = ? AND month = ?'
+  ).all(profileId, month);
+  const overrideMap = {};
+  for (const r of overrideRows) overrideMap[r.category_id] = r.target;
+
+  return incomeCategories.map(c => ({
+    id:       c.id,
+    name:     c.name,
+    target:   overrideMap[c.id] ?? c.monthly_target,
+    received: receivedMap[c.id] ?? 0,
+  }));
+}
+
+// Computes available (rollover + target - spent) for every expense category for a given month.
 // Returns a Map: categoryId -> { target, spent, rollover, available }
 function computeBudget(profileId, month) {
   const first = earliestMonth(profileId);
   const categories = db.prepare(
-    'SELECT id, monthly_target FROM categories WHERE profile_id = ?'
+    'SELECT id, monthly_target FROM categories WHERE profile_id = ? AND is_income = 0'
   ).all(profileId);
 
   if (!categories.length) return new Map();
@@ -154,4 +195,4 @@ function computeForMonths(profileId, months, rollover, categories) {
   return result;
 }
 
-module.exports = { db, computeBudget, addMonths, monthsBetween, earliestMonth };
+module.exports = { db, computeBudget, computeIncome, addMonths, monthsBetween, earliestMonth };

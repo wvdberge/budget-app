@@ -15,33 +15,27 @@ router.get('/', (req, res) => {
 
 // POST /api/categories
 router.post('/', (req, res) => {
-  const { profileId, groupId, name, monthly_target, sort_order } = req.body;
+  const { profileId, groupId, name, monthly_target, sort_order, is_income } = req.body;
   if (!profileId || !groupId || !name?.trim()) {
     return res.status(400).json({ error: 'profileId, groupId and name required' });
   }
   const info = db.prepare(
-    'INSERT INTO categories (group_id, profile_id, name, monthly_target, sort_order) VALUES (?, ?, ?, ?, ?)'
-  ).run(groupId, profileId, name.trim(), monthly_target ?? 0, sort_order ?? 0);
-  res.status(201).json({
-    id: info.lastInsertRowid,
-    group_id: Number(groupId),
-    profile_id: Number(profileId),
-    name: name.trim(),
-    monthly_target: monthly_target ?? 0,
-    sort_order: sort_order ?? 0,
-  });
+    'INSERT INTO categories (group_id, profile_id, name, monthly_target, sort_order, is_income) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(groupId, profileId, name.trim(), monthly_target ?? 0, sort_order ?? 0, is_income ? 1 : 0);
+  res.status(201).json(db.prepare('SELECT * FROM categories WHERE id = ?').get(info.lastInsertRowid));
 });
 
 // PUT /api/categories/:id
 router.put('/:id', (req, res) => {
-  const { name, monthly_target, group_id, sort_order } = req.body;
+  const { name, monthly_target, group_id, sort_order, is_income } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name required' });
   const info = db.prepare(`
     UPDATE categories
     SET name = ?, monthly_target = COALESCE(?, monthly_target),
-        group_id = COALESCE(?, group_id), sort_order = COALESCE(?, sort_order)
+        group_id = COALESCE(?, group_id), sort_order = COALESCE(?, sort_order),
+        is_income = COALESCE(?, is_income)
     WHERE id = ?
-  `).run(name.trim(), monthly_target ?? null, group_id ?? null, sort_order ?? null, req.params.id);
+  `).run(name.trim(), monthly_target ?? null, group_id ?? null, sort_order ?? null, is_income ?? null, req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: 'not found' });
   res.json(db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id));
 });

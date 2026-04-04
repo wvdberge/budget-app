@@ -11,6 +11,7 @@ export default function TransactionsView() {
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts]         = useState([]);
   const [categories, setCategories]     = useState([]);
+  const [rules, setRules]               = useState([]);
   const [loading, setLoading]           = useState(false);
   const [editTx, setEditTx]             = useState(null);   // null = closed, {} = new, tx = edit
   const [showImport, setShowImport]     = useState(false);
@@ -23,10 +24,12 @@ export default function TransactionsView() {
       api.transactions.list(profileId, month),
       api.accounts.list(profileId),
       api.categories.list(profileId),
-    ]).then(([txs, accs, cats]) => {
+      api.rules.list(profileId),
+    ]).then(([txs, accs, cats, rls]) => {
       setTransactions(txs);
       setAccounts(accs);
       setCategories(cats);
+      setRules(rls);
     }).finally(() => setLoading(false));
   }
 
@@ -98,6 +101,7 @@ export default function TransactionsView() {
           tx={editTx}
           accounts={accounts}
           categories={categories}
+          rules={rules}
           profileId={profileId}
           month={month}
           onClose={() => setEditTx(null)}
@@ -110,6 +114,7 @@ export default function TransactionsView() {
           profileId={profileId}
           accounts={accounts}
           categories={categories}
+          rules={rules}
           onClose={() => setShowImport(false)}
           onSaved={load}
         />

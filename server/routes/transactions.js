@@ -28,23 +28,23 @@ router.get('/', (req, res) => {
 
 // POST /api/transactions
 router.post('/', (req, res) => {
-  const { profileId, accountId, categoryId, date, amount, description, is_recurring } = req.body;
+  const { profileId, accountId, categoryId, date, amount, description, is_recurring, recurring_frequency } = req.body;
   if (!profileId || !accountId || !date || amount === undefined) {
     return res.status(400).json({ error: 'profileId, accountId, date and amount required' });
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
 
   const info = db.prepare(`
-    INSERT INTO transactions (profile_id, account_id, category_id, date, amount, description, is_recurring)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(profileId, accountId, categoryId ?? null, date, amount, description ?? '', is_recurring ? 1 : 0);
+    INSERT INTO transactions (profile_id, account_id, category_id, date, amount, description, is_recurring, recurring_frequency)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(profileId, accountId, categoryId ?? null, date, amount, description ?? '', is_recurring ? 1 : 0, recurring_frequency ?? 'monthly');
 
   res.status(201).json(db.prepare('SELECT * FROM transactions WHERE id = ?').get(info.lastInsertRowid));
 });
 
 // PUT /api/transactions/:id
 router.put('/:id', (req, res) => {
-  const { accountId, categoryId, date, amount, description, is_recurring } = req.body;
+  const { accountId, categoryId, date, amount, description, is_recurring, recurring_frequency } = req.body;
   if (!accountId || !date || amount === undefined) {
     return res.status(400).json({ error: 'accountId, date and amount required' });
   }
@@ -52,9 +52,9 @@ router.put('/:id', (req, res) => {
 
   const info = db.prepare(`
     UPDATE transactions
-    SET account_id = ?, category_id = ?, date = ?, amount = ?, description = ?, is_recurring = ?
+    SET account_id = ?, category_id = ?, date = ?, amount = ?, description = ?, is_recurring = ?, recurring_frequency = ?
     WHERE id = ?
-  `).run(accountId, categoryId ?? null, date, amount, description ?? '', is_recurring ? 1 : 0, req.params.id);
+  `).run(accountId, categoryId ?? null, date, amount, description ?? '', is_recurring ? 1 : 0, recurring_frequency ?? 'monthly', req.params.id);
 
   if (info.changes === 0) return res.status(404).json({ error: 'not found' });
   res.json(db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id));

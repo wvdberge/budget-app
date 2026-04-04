@@ -67,9 +67,10 @@ function AddForm({ placeholder, onAdd, extraField }) {
 
 export default function ManageView() {
   const { profileId, profiles, reloadProfiles } = useContext(AppContext);
-  const [accounts, setAccounts]   = useState([]);
-  const [groups, setGroups]       = useState([]);
+  const [accounts, setAccounts]     = useState([]);
+  const [groups, setGroups]         = useState([]);
   const [categories, setCategories] = useState([]);
+  const [rules, setRules]           = useState([]);
 
   function load() {
     if (!profileId) return;
@@ -77,10 +78,12 @@ export default function ManageView() {
       api.accounts.list(profileId),
       api.groups.list(profileId),
       api.categories.list(profileId),
-    ]).then(([accs, grps, cats]) => {
+      api.rules.list(profileId),
+    ]).then(([accs, grps, cats, rls]) => {
       setAccounts(accs);
       setGroups(grps);
       setCategories(cats);
+      setRules(rls);
     });
   }
 
@@ -123,13 +126,17 @@ export default function ManageView() {
   }
 
   // ── Categories ───────────────────────────────────────────────────────────
-  async function addCategory(name, targetStr, groupId) {
+  async function addCategory(name, targetStr, isIncome, groupId) {
     const target = parseFloat(String(targetStr).replace(',', '.')) || 0;
-    await api.categories.create(profileId, groupId, name, target);
+    await api.categories.create(profileId, groupId, name, target, isIncome);
     load();
   }
   async function updateCategory(id, name) {
     await api.categories.update(id, { name });
+    load();
+  }
+  async function toggleCategoryIncome(c) {
+    await api.categories.update(c.id, { name: c.name, monthly_target: c.monthly_target, is_income: c.is_income ? 0 : 1 });
     load();
   }
   async function updateCategoryTarget(id, targetStr) {
@@ -183,6 +190,36 @@ export default function ManageView() {
         <AddForm placeholder="Nieuwe rekening" extraField="Beginsaldo (€)" onAdd={addAccount} />
       </div>
 
+      {/* Category rules */}
+      <div className="manage-section" style={{ gridColumn: '1 / -1' }}>
+        <h3>Categorieregels</h3>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+          Als een omschrijving een zoekwoord bevat, wordt de categorie automatisch ingevuld bij het aanmaken of importeren van transacties.
+        </p>
+        {rules.length === 0 && (
+          <div style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>Nog geen regels.</div>
+        )}
+        <ul className="manage-list">
+          {rules.map(r => (
+            <li key={r.id} className="manage-item">
+              <span className="manage-item-name" style={{ fontFamily: 'monospace' }}>{r.keyword}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 4 }}>→</span>
+              <span style={{ fontSize: 13, marginLeft: 4 }}>{r.category_name}</span>
+              <button
+                className="icon-btn"
+                style={{ marginLeft: 'auto', color: 'var(--negative)' }}
+                onClick={async () => { await api.rules.delete(r.id); load(); }}
+                title="Verwijderen"
+              >✕</button>
+            </li>
+          ))}
+        </ul>
+        <RuleAddForm categories={categories} onAdd={async (keyword, categoryId) => {
+          await api.rules.create(profileId, keyword, categoryId);
+          load();
+        }} />
+      </div>
+
       {/* Category groups + categories — full width */}
       <div className="manage-section" style={{ gridColumn: '1 / -1' }}>
         <h3>Categoriegroepen &amp; categorieën</h3>
@@ -222,15 +259,19 @@ export default function ManageView() {
                     onDelete={() => deleteCategory(c.id)}
                   >
                     <TargetEditor value={c.monthly_target} onSave={v => updateCategoryTarget(c.id, v)} />
+                    <button
+                      className="btn btn-sm"
+                      title={c.is_income ? 'Inkomenscategorie — klik om te wijzigen' : 'Uitgavencategorie — klik om inkomen te maken'}
+                      onClick={() => toggleCategoryIncome(c)}
+                      style={{ fontSize: 11, padding: '1px 5px', opacity: c.is_income ? 1 : 0.35 }}
+                    >
+                      inkomen
+                    </button>
                   </EditableItem>
                 ))}
               </ul>
               <div style={{ paddingLeft: 16 }}>
-                <AddForm
-                  placeholder="Nieuwe categorie"
-                  extraField="Doel (€)"
-                  onAdd={(name, target) => addCategory(name, target, g.id)}
-                />
+                <CategoryAddForm onAdd={(name, target, isIncome) => addCategory(name, target, isIncome, g.id)} />
               </div>
             </div>
           );
@@ -269,6 +310,63 @@ function GroupAddForm({ onAdd }) {
   );
 }
 
+function CategoryAddForm({ onAdd }) {
+  const [name, setName]         = useState('');
+  const [target, setTarget]     = useState('');
+  const [isIncome, setIsIncome] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    await onAdd(name.trim(), target, isIncome);
+    setName('');
+    setTarget('');
+    setIsIncome(false);
+  }
+
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Nieuwe categorie" style={{ flex: 1 }} />
+      <input value={target} onChange={e => setTarget(e.target.value)} placeholder="Doel (€)" style={{ width: 80 }} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 12, whiteSpace: 'nowrap', cursor: 'pointer', margin: 0 }}>
+        <input type="checkbox" checked={isIncome} onChange={e => setIsIncome(e.target.checked)} />
+        inkomen
+      </label>
+      <button type="submit" className="btn btn-sm btn-primary">+</button>
+    </form>
+  );
+}
+
+function RuleAddForm({ categories, onAdd }) {
+  const [keyword, setKeyword]     = useState('');
+  const [categoryId, setCategoryId] = useState('');
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!keyword.trim() || !categoryId) return;
+    await onAdd(keyword.trim(), Number(categoryId));
+    setKeyword('');
+    setCategoryId('');
+  }
+
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+      <input
+        value={keyword}
+        onChange={e => setKeyword(e.target.value)}
+        placeholder="Zoekwoord (bijv. AH)"
+        style={{ flex: 1 }}
+      />
+      <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={{ flex: 1 }}>
+        <option value="">— kies categorie —</option>
+        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <button type="submit" className="btn btn-sm btn-primary">+</button>
+    </form>
+  );
+}
+
+>>>>>>> 9ac2ee0 (feat: recurring frequency, category rules, income tracking)
 function TargetEditor({ value, onSave, title = 'Klik om standaard doel te bewerken' }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal]         = useState('');

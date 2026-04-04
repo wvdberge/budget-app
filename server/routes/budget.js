@@ -1,5 +1,5 @@
 const express = require('express');
-const { db, computeBudget } = require('../db');
+const { db, computeBudget, computeIncome } = require('../db');
 const router = express.Router();
 
 // GET /api/budget/:profileId/:month
@@ -17,26 +17,13 @@ router.get('/:profileId/:month', (req, res) => {
   ).all(profileId);
 
   const budgetMap = computeBudget(Number(profileId), month);
-
-  // Income groups: sum positive transactions in income categories for this month
-  const incomeGroupIds = new Set(groups.filter(g => g.is_income).map(g => g.id));
-  const incomeCategoryIds = categories.filter(c => incomeGroupIds.has(c.group_id)).map(c => c.id);
-  let totalIncome = 0;
-  if (incomeCategoryIds.length > 0) {
-    const placeholders = incomeCategoryIds.map(() => '?').join(',');
-    const incomeRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM transactions
-      WHERE profile_id = ? AND substr(date,1,7) = ? AND amount > 0 AND is_transfer = 0
-        AND category_id IN (${placeholders})
-    `).get(profileId, month, ...incomeCategoryIds);
-    totalIncome = incomeRow.total;
-  }
+  const incomeCategories = computeIncome(Number(profileId), month);
 
   const groupMap = {};
   for (const g of groups) groupMap[g.id] = { ...g, categories: [] };
 
   for (const c of categories) {
+    if (c.is_income) continue; // income categories shown separately
     const b = budgetMap.get(c.id) ?? { target: 0, spent: 0, rollover: 0, available: 0 };
     const entry = { ...c, ...b };
     if (groupMap[c.group_id]) groupMap[c.group_id].categories.push(entry);
@@ -44,7 +31,7 @@ router.get('/:profileId/:month', (req, res) => {
 
   res.json({
     month,
-    totalIncome,
+    incomeCategories,
     groups: groups.map(g => groupMap[g.id]),
   });
 });
@@ -67,51 +54,83 @@ router.put('/:profileId/:month/:categoryId', (req, res) => {
 });
 
 // POST /api/budget/:profileId/:month/apply-recurring
-// Copy recurring transactions from the previous month into this month (skip if already copied)
+// Apply recurring transactions into this month based on their frequency.
+// Uses the original anchor transaction as the source of truth for all frequencies.
 router.post('/:profileId/:month/apply-recurring', (req, res) => {
   const { profileId, month } = req.params;
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
 
-  // Compute the previous month
-  let [y, m] = month.split('-').map(Number);
-  m -= 1;
-  if (m < 1) { m = 12; y--; }
-  const prevMonth = `${y}-${String(m).padStart(2, '0')}`;
+  const [targetYear, targetMonthNum] = month.split('-').map(Number);
 
-  // Find recurring transactions from the previous month
-  const recurring = db.prepare(`
+  // Find all anchor recurring transactions (the originals, not copies)
+  const anchors = db.prepare(`
     SELECT * FROM transactions
-    WHERE profile_id = ? AND substr(date,1,7) = ? AND is_recurring = 1
-  `).all(profileId, prevMonth);
+    WHERE profile_id = ? AND is_recurring = 1 AND recurring_anchor_id IS NULL
+  `).all(profileId);
 
-  if (!recurring.length) return res.json({ created: 0 });
+  if (!anchors.length) return res.json({ created: 0 });
 
-  // Build the target date: same day-of-month, in the new month (clamped to end of month)
   const insert = db.prepare(`
-    INSERT INTO transactions (profile_id, account_id, category_id, date, amount, description, is_recurring, recurring_anchor_id)
-    VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+    INSERT INTO transactions (profile_id, account_id, category_id, date, amount, description, is_recurring, recurring_frequency, recurring_anchor_id)
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
   `);
+
+  function calcMonthDiff(anchorMonthStr, targetMonthStr) {
+    const [ay, am] = anchorMonthStr.split('-').map(Number);
+    const [ty, tm] = targetMonthStr.split('-').map(Number);
+    return (ty - ay) * 12 + (tm - am);
+  }
+
+  function clampedDate(year, monthNum, day) {
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+    const d = Math.min(day, daysInMonth);
+    return `${year}-${String(monthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
 
   let created = 0;
   const insertMany = db.transaction(() => {
-    for (const t of recurring) {
-      const origDay = parseInt(t.date.slice(8, 10), 10);
-      // Clamp to last day of the new month
-      const daysInMonth = new Date(y, m, 0).getDate();
-      const day = Math.min(origDay, daysInMonth);
-      const newDate = `${month}-${String(day).padStart(2, '0')}`;
+    for (const anchor of anchors) {
+      const freq = anchor.recurring_frequency || 'monthly';
+      const anchorMonthStr = anchor.date.slice(0, 7);
+      const diff = calcMonthDiff(anchorMonthStr, month);
 
-      const anchor = t.recurring_anchor_id ?? t.id;
+      // Never apply for months before or equal to the anchor's own month
+      if (diff <= 0) continue;
 
-      // Skip if a recurring transaction with this anchor already exists in the target month
-      const exists = db.prepare(`
-        SELECT 1 FROM transactions
-        WHERE profile_id = ? AND substr(date,1,7) = ? AND recurring_anchor_id = ?
-      `).get(profileId, month, anchor);
-      if (exists) continue;
+      if (freq === 'weekly') {
+        // Create one copy per matching weekday within the target month
+        const anchorWeekday = new Date(anchor.date).getDay();
+        const daysInMonth = new Date(targetYear, targetMonthNum, 0).getDate();
 
-      insert.run(profileId, t.account_id, t.category_id, newDate, t.amount, t.description, anchor);
-      created++;
+        for (let d = 1; d <= daysInMonth; d++) {
+          if (new Date(targetYear, targetMonthNum - 1, d).getDay() !== anchorWeekday) continue;
+          const dateStr = `${month}-${String(d).padStart(2, '0')}`;
+
+          const exists = db.prepare(`
+            SELECT 1 FROM transactions WHERE profile_id = ? AND date = ? AND recurring_anchor_id = ?
+          `).get(profileId, dateStr, anchor.id);
+          if (exists) continue;
+
+          insert.run(profileId, anchor.account_id, anchor.category_id, dateStr, anchor.amount, anchor.description, freq, anchor.id);
+          created++;
+        }
+      } else {
+        // monthly: every month (period=1), quarterly: every 3, yearly: every 12
+        const period = freq === 'quarterly' ? 3 : freq === 'yearly' ? 12 : 1;
+        if (diff % period !== 0) continue;
+
+        const exists = db.prepare(`
+          SELECT 1 FROM transactions
+          WHERE profile_id = ? AND substr(date,1,7) = ? AND recurring_anchor_id = ?
+        `).get(profileId, month, anchor.id);
+        if (exists) continue;
+
+        const origDay = parseInt(anchor.date.slice(8, 10), 10);
+        const newDate = clampedDate(targetYear, targetMonthNum, origDay);
+
+        insert.run(profileId, anchor.account_id, anchor.category_id, newDate, anchor.amount, anchor.description, freq, anchor.id);
+        created++;
+      }
     }
   });
   insertMany();

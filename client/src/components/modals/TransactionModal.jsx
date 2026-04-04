@@ -1,24 +1,50 @@
 import { useState } from 'react';
 import { api } from '../../api.js';
 
-export default function TransactionModal({ tx, accounts, categories, profileId, month, onClose, onSaved }) {
-  const isNew = !tx.id;
+const FREQUENCIES = [
+  { value: 'none',      label: 'Niet terugkerend' },
+  { value: 'weekly',    label: 'Wekelijks' },
+  { value: 'monthly',   label: 'Maandelijks' },
+  { value: 'quarterly', label: 'Per kwartaal' },
+  { value: 'yearly',    label: 'Jaarlijks' },
+];
 
-  // Default date to first day of current month view when adding new
+function matchRule(rules, description) {
+  if (!description || !rules?.length) return null;
+  const lower = description.toLowerCase();
+  return rules.find(r => lower.includes(r.keyword.toLowerCase())) ?? null;
+}
+
+export default function TransactionModal({ tx, accounts, categories, rules, profileId, month, onClose, onSaved }) {
+  const isNew = !tx.id;
   const defaultDate = tx.date ?? `${month}-01`;
 
+  const initFreq = tx.is_recurring
+    ? (tx.recurring_frequency || 'monthly')
+    : 'none';
+
   const [form, setForm] = useState({
-    date:         defaultDate,
-    description:  tx.description ?? '',
-    amount:       tx.amount !== undefined ? String(Math.abs(tx.amount)).replace('.', ',') : '',
-    isExpense:    tx.amount === undefined ? true : tx.amount < 0,
-    accountId:    tx.account_id ?? (accounts[0]?.id ?? ''),
-    categoryId:   tx.category_id ?? '',
-    is_recurring: tx.is_recurring === 1,
+    date:        defaultDate,
+    description: tx.description ?? '',
+    amount:      tx.amount !== undefined ? String(Math.abs(tx.amount)).replace('.', ',') : '',
+    isExpense:   tx.amount === undefined ? true : tx.amount < 0,
+    accountId:   tx.account_id ?? (accounts[0]?.id ?? ''),
+    categoryId:  tx.category_id ?? '',
+    frequency:   initFreq,
   });
   const [error, setError] = useState('');
 
   function set(key, value) { setForm(f => ({ ...f, [key]: value })); }
+
+  function handleDescriptionChange(value) {
+    const updates = { description: value };
+    // Auto-suggest category from rules if category not yet chosen
+    if (!form.categoryId) {
+      const match = matchRule(rules, value);
+      if (match) updates.categoryId = String(match.category_id);
+    }
+    setForm(f => ({ ...f, ...updates }));
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -29,14 +55,16 @@ export default function TransactionModal({ tx, accounts, categories, profileId, 
     if (!form.accountId) { setError('Selecteer een rekening'); return; }
     if (!form.date) { setError('Voer een datum in'); return; }
 
+    const isRecurring = form.frequency !== 'none';
     const payload = {
       profileId,
-      accountId:    Number(form.accountId),
-      categoryId:   form.categoryId ? Number(form.categoryId) : null,
-      date:         form.date,
-      amount:       form.isExpense ? -numeric : numeric,
-      description:  form.description,
-      is_recurring: form.is_recurring,
+      accountId:           Number(form.accountId),
+      categoryId:          form.categoryId ? Number(form.categoryId) : null,
+      date:                form.date,
+      amount:              form.isExpense ? -numeric : numeric,
+      description:         form.description,
+      is_recurring:        isRecurring,
+      recurring_frequency: isRecurring ? form.frequency : 'monthly',
     };
 
     try {
@@ -88,7 +116,11 @@ export default function TransactionModal({ tx, accounts, categories, profileId, 
 
           <div className="form-row">
             <label>Omschrijving</label>
-            <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="Optioneel" />
+            <input
+              value={form.description}
+              onChange={e => handleDescriptionChange(e.target.value)}
+              placeholder="Optioneel"
+            />
           </div>
 
           <div className="form-row-inline">
@@ -109,14 +141,10 @@ export default function TransactionModal({ tx, accounts, categories, profileId, 
           </div>
 
           <div className="form-row">
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', margin: 0 }}>
-              <input
-                type="checkbox"
-                checked={form.is_recurring}
-                onChange={e => set('is_recurring', e.target.checked)}
-              />
-              Terugkerende transactie
-            </label>
+            <label>Herhaling</label>
+            <select value={form.frequency} onChange={e => set('frequency', e.target.value)}>
+              {FREQUENCIES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+            </select>
           </div>
 
           {error && <div className="error-msg">{error}</div>}

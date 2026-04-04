@@ -2,7 +2,13 @@ import { useState, useRef } from 'react';
 import { api } from '../../api.js';
 import { formatAmount, formatDate } from '../../format.js';
 
-export default function ImportModal({ profileId, accounts, categories, onClose, onSaved }) {
+function matchRule(rules, description) {
+  if (!description || !rules?.length) return null;
+  const lower = description.toLowerCase();
+  return rules.find(r => lower.includes(r.keyword.toLowerCase())) ?? null;
+}
+
+export default function ImportModal({ profileId, accounts, categories, rules, onClose, onSaved }) {
   const [step, setStep]             = useState('config'); // 'config' | 'preview' | 'done'
   const [bank, setBank]             = useState('abnamro');
   const [accountId, setAccountId]   = useState(accounts[0]?.id ?? '');
@@ -21,7 +27,10 @@ export default function ImportModal({ profileId, accounts, categories, onClose, 
     try {
       const result = await api.import.parse(bank, file);
       if (!result.transactions.length) { setError('Geen transacties gevonden in dit bestand.'); return; }
-      setParsed(result.transactions.map(t => ({ ...t, _selected: true, categoryId: '' })));
+      setParsed(result.transactions.map(t => {
+        const rule = matchRule(rules, t.description);
+        return { ...t, _selected: true, categoryId: rule ? String(rule.category_id) : '' };
+      }));
       setStep('preview');
     } catch (e) {
       setError(e.message);
