@@ -1,6 +1,5 @@
 # Stage 1: build the React client
 FROM node:20-alpine AS client-build
-RUN apk add --no-cache python3 make g++
 WORKDIR /build/client
 COPY client/package*.json ./
 RUN npm install --include=dev
