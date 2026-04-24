@@ -1,13 +1,20 @@
+# Stage 1: build the React client
+FROM node:20-alpine AS client-build
+WORKDIR /app/client
+COPY client/package*.json ./
+RUN npm ci
+COPY client/ ./
+RUN npm run build
+
+# Stage 2: production server
 FROM node:20
 WORKDIR /app
 
-# Install server dependencies
 COPY server/package*.json ./
 RUN npm install --omit=dev
 
-# Copy server source and pre-built client
 COPY server/ ./
-COPY client/dist ./public
+COPY --from=client-build /app/client/dist ./public
 
 RUN mkdir -p /data
 

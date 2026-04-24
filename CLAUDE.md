@@ -18,20 +18,14 @@ node test/test.js
 
 **Deploy on NAS:**
 
-The app runs on the NAS via Dockge, pulling the image from `ghcr.io/wvdberge/budget-app:latest`. GitHub Actions builds and pushes a new image on every push to `main`.
+The app runs on the NAS via Dockge (port 5002), pulling `ghcr.io/wvdberge/budget-app:latest`. GitHub Actions builds the full Docker image (including client) and pushes to GHCR on every push to `main`.
 
-`client/dist` is committed to the repo (not built in Docker). So when client files change, rebuild locally before committing:
+Deploy workflow:
+1. Commit and push changes
+2. Wait ~2 min for GitHub Actions to build
+3. In **Dockge**: pull the new image and redeploy the `budget` stack
 
-```bash
-cd client && npm run build          # rebuild client/dist
-git add client/dist
-git commit -m "rebuild client"
-git push
-```
-
-For server-only changes, just commit and push — no client rebuild needed.
-
-After pushing, GitHub Actions builds the image automatically. Then in **Dockge** (port 5002): pull the new image and redeploy the `budget` stack.
+The NAS never needs to build anything locally.
 
 ## Architecture
 
