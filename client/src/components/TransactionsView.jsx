@@ -45,6 +45,8 @@ export default function TransactionsView() {
 
   if (loading) return <div className="empty-state">Laden…</div>;
 
+  const selectedAccount = filterAccountId ? accounts.find(a => String(a.id) === filterAccountId) : null;
+
   return (
     <div>
       <div className="tx-toolbar">
@@ -65,18 +67,15 @@ export default function TransactionsView() {
         </span>
       </div>
 
-      {filterAccountId && (() => {
-        const acc = accounts.find(a => String(a.id) === filterAccountId);
-        return acc ? (
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '10px 4px', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 15 }}>{acc.name}</span>
-            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Huidig saldo:</span>
-            <span style={{ fontWeight: 600, fontSize: 15, color: acc.current_balance >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
-              {formatAmount(acc.current_balance)}
-            </span>
-          </div>
-        ) : null;
-      })()}
+      {selectedAccount && (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '10px 4px', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>{selectedAccount.name}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Huidig saldo:</span>
+          <span style={{ fontWeight: 600, fontSize: 15, color: selectedAccount.current_balance >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
+            {formatAmount(selectedAccount.current_balance)}
+          </span>
+        </div>
+      )}
 
       {transactions.length === 0 ? (
         <div className="empty-state">Geen transacties in deze maand.</div>
