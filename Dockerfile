@@ -7,8 +7,8 @@ COPY client/ ./
 RUN npm run build
 
 # Stage 2: production image
-FROM node:20-alpine
-RUN apk add --no-cache python3 make g++
+# node:20 (Debian) includes python3/make/g++ for native modules — no apk needed
+FROM node:20
 WORKDIR /app
 
 # Install server dependencies
