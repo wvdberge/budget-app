@@ -49,7 +49,12 @@ export const api = {
   },
 
   transactions: {
-    list:   (profileId, month) => req('GET',    `/api/transactions?profileId=${profileId}${month ? `&month=${month}` : ''}`),
+    list:   (profileId, month, accountId) => {
+      let url = `/api/transactions?profileId=${profileId}`;
+      if (accountId) url += `&accountId=${accountId}`;
+      else if (month) url += `&month=${month}`;
+      return req('GET', url);
+    },
     create: (t)                => req('POST',   '/api/transactions', t),
     update: (id, t)            => req('PUT',    `/api/transactions/${id}`, t),
     delete: (id)               => req('DELETE', `/api/transactions/${id}`),

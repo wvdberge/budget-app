@@ -16,12 +16,13 @@ export default function TransactionsView() {
   const [editTx, setEditTx]             = useState(null);   // null = closed, {} = new, tx = edit
   const [showImport, setShowImport]     = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
+  const [filterAccountId, setFilterAccountId] = useState('');
 
   function load() {
     if (!profileId) return;
     setLoading(true);
     Promise.all([
-      api.transactions.list(profileId, month),
+      api.transactions.list(profileId, month, filterAccountId || null),
       api.accounts.list(profileId),
       api.categories.list(profileId),
       api.rules.list(profileId),
@@ -33,7 +34,7 @@ export default function TransactionsView() {
     }).finally(() => setLoading(false));
   }
 
-  useEffect(load, [profileId, month]);
+  useEffect(load, [profileId, month, filterAccountId]);
 
   async function deleteTx(id, isTransfer) {
     const msg = isTransfer ? 'Overboeking verwijderen? Beide boekingen worden verwijderd.' : 'Transactie verwijderen?';
@@ -47,9 +48,18 @@ export default function TransactionsView() {
   return (
     <div>
       <div className="tx-toolbar">
-        <button className="btn btn-primary btn-sm" onClick={() => setEditTx({})}>+ Transactie</button>
+        <button className="btn btn-primary btn-sm" onClick={() => setEditTx(filterAccountId ? { account_id: Number(filterAccountId) } : {})}>+ Transactie</button>
         <button className="btn btn-sm" onClick={() => setShowTransfer(true)}>↔ Overboeking</button>
         <button className="btn btn-sm" onClick={() => setShowImport(true)}>CSV importeren</button>
+        <select
+          value={filterAccountId}
+          onChange={e => setFilterAccountId(e.target.value)}
+          style={{ fontSize: 13 }}
+        >
+          <option value="">Alle rekeningen</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        {filterAccountId && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Alle maanden</span>}
         <span className="spacer" />
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
           {transactions.length} transactie{transactions.length !== 1 ? 's' : ''}

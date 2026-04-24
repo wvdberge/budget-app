@@ -2,9 +2,10 @@ const express = require('express');
 const { db } = require('../db');
 const router = express.Router();
 
-// GET /api/transactions?profileId=&month=YYYY-MM
+// GET /api/transactions?profileId=&month=YYYY-MM&accountId=
+// accountId takes precedence over month; when accountId is set, all months are returned.
 router.get('/', (req, res) => {
-  const { profileId, month } = req.query;
+  const { profileId, month, accountId } = req.query;
   if (!profileId) return res.status(400).json({ error: 'profileId required' });
 
   let q = `
@@ -16,7 +17,10 @@ router.get('/', (req, res) => {
   `;
   const params = [profileId];
 
-  if (month) {
+  if (accountId) {
+    q += ' AND t.account_id = ?';
+    params.push(accountId);
+  } else if (month) {
     if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
     q += ' AND substr(t.date,1,7) = ?';
     params.push(month);
