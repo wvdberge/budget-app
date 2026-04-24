@@ -16,15 +16,23 @@ The Vite dev server proxies all `/api` requests to port 3000, so no CORS setup i
 node test/test.js
 ```
 
-**Production build:**
+**Deploy on NAS:**
+
+The client is pre-built locally and `client/dist` is committed to the repo. The Docker image has no client build step, so you must build before deploying whenever client files change:
+
 ```bash
-cd client && npm run build          # outputs to client/dist/
+cd client && npm run build          # rebuild client/dist locally
+git add client/dist
+git commit -m "rebuild client"
+git push
 ```
 
-**Deploy on NAS:**
+Then on the NAS:
 ```bash
 cd /volume1/docker/budget-app && git pull && sudo docker compose up -d --build
 ```
+
+If only server files changed, skip the client build step.
 
 ## Architecture
 
