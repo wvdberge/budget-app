@@ -59,12 +59,24 @@ export default function TransactionsView() {
           <option value="">Alle rekeningen</option>
           {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
-        {filterAccountId && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Alle maanden</span>}
         <span className="spacer" />
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
           {transactions.length} transactie{transactions.length !== 1 ? 's' : ''}
         </span>
       </div>
+
+      {filterAccountId && (() => {
+        const acc = accounts.find(a => String(a.id) === filterAccountId);
+        return acc ? (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '10px 4px', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: 15 }}>{acc.name}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Huidig saldo:</span>
+            <span style={{ fontWeight: 600, fontSize: 15, color: acc.current_balance >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
+              {formatAmount(acc.current_balance)}
+            </span>
+          </div>
+        ) : null;
+      })()}
 
       {transactions.length === 0 ? (
         <div className="empty-state">Geen transacties in deze maand.</div>
