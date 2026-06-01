@@ -7,26 +7,43 @@ router.get('/', (req, res) => {
   const { profileId } = req.query;
   if (!profileId) return res.status(400).json({ error: 'profileId required' });
   res.json(db.prepare(`
-    SELECT r.*, c.name as category_name
+    SELECT r.*,
+           c.name as category_name,
+           a.name as transfer_account_name
     FROM category_rules r
     LEFT JOIN categories c ON c.id = r.category_id
+    LEFT JOIN accounts   a ON a.id = r.transfer_account_id
     WHERE r.profile_id = ?
     ORDER BY r.keyword COLLATE NOCASE
   `).all(profileId));
 });
 
 // POST /api/rules
+// Body: { profileId, keyword, categoryId? | transferAccountId? } — exactly one target.
 router.post('/', (req, res) => {
-  const { profileId, keyword, categoryId } = req.body;
-  if (!profileId || !keyword || !categoryId) {
-    return res.status(400).json({ error: 'profileId, keyword and categoryId required' });
+  const { profileId, keyword, categoryId, transferAccountId } = req.body;
+  if (!profileId || !keyword) {
+    return res.status(400).json({ error: 'profileId and keyword required' });
   }
-  const info = db.prepare(`
-    INSERT INTO category_rules (profile_id, keyword, category_id)
-    VALUES (?, ?, ?)
-    ON CONFLICT(profile_id, keyword) DO UPDATE SET category_id = excluded.category_id
-  `).run(profileId, keyword.trim(), categoryId);
-  res.status(201).json(db.prepare('SELECT r.*, c.name as category_name FROM category_rules r LEFT JOIN categories c ON c.id = r.category_id WHERE r.id = ?').get(info.lastInsertRowid));
+  if ((!categoryId && !transferAccountId) || (categoryId && transferAccountId)) {
+    return res.status(400).json({ error: 'exactly one of categoryId or transferAccountId required' });
+  }
+  const trimmed = keyword.trim();
+  db.prepare(`
+    INSERT INTO category_rules (profile_id, keyword, category_id, transfer_account_id)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(profile_id, keyword) DO UPDATE SET
+      category_id         = excluded.category_id,
+      transfer_account_id = excluded.transfer_account_id
+  `).run(profileId, trimmed, categoryId ?? null, transferAccountId ?? null);
+
+  res.status(201).json(db.prepare(`
+    SELECT r.*, c.name as category_name, a.name as transfer_account_name
+    FROM category_rules r
+    LEFT JOIN categories c ON c.id = r.category_id
+    LEFT JOIN accounts   a ON a.id = r.transfer_account_id
+    WHERE r.profile_id = ? AND r.keyword = ?
+  `).get(profileId, trimmed));
 });
 
 // DELETE /api/rules/:id

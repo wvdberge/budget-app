@@ -15,6 +15,31 @@ try { db.exec(`ALTER TABLE transactions ADD COLUMN transfer_peer_id INTEGER REFE
 try { db.exec(`ALTER TABLE category_groups ADD COLUMN is_income INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
 try { db.exec(`ALTER TABLE transactions ADD COLUMN recurring_frequency TEXT NOT NULL DEFAULT 'monthly'`); } catch (_) {}
 try { db.exec(`ALTER TABLE categories ADD COLUMN is_income INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
+try { db.exec(`ALTER TABLE transactions ADD COLUMN is_adjustment INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
+
+// One-time rebuild of category_rules to make category_id nullable and add transfer_account_id.
+// Guarded by checking whether the new column already exists.
+try {
+  const ruleCols = db.prepare("PRAGMA table_info(category_rules)").all();
+  if (ruleCols.length && !ruleCols.some(c => c.name === 'transfer_account_id')) {
+    db.exec(`
+      BEGIN;
+      CREATE TABLE category_rules_new (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id          INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        keyword             TEXT NOT NULL,
+        category_id         INTEGER REFERENCES categories(id) ON DELETE CASCADE,
+        transfer_account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
+        UNIQUE(profile_id, keyword)
+      );
+      INSERT INTO category_rules_new (id, profile_id, keyword, category_id)
+        SELECT id, profile_id, keyword, category_id FROM category_rules;
+      DROP TABLE category_rules;
+      ALTER TABLE category_rules_new RENAME TO category_rules;
+      COMMIT;
+    `);
+  }
+} catch (_) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS profiles (
@@ -66,10 +91,11 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS category_rules (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-    keyword     TEXT NOT NULL,
-    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id          INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    keyword             TEXT NOT NULL,
+    category_id         INTEGER REFERENCES categories(id) ON DELETE CASCADE,
+    transfer_account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
     UNIQUE(profile_id, keyword)
   );
 `);
@@ -117,7 +143,7 @@ function computeIncome(profileId, month) {
   const receivedRows = db.prepare(`
     SELECT category_id, SUM(amount) as total
     FROM transactions
-    WHERE profile_id = ? AND substr(date,1,7) = ? AND amount > 0 AND is_transfer = 0
+    WHERE profile_id = ? AND substr(date,1,7) = ? AND amount > 0 AND is_transfer = 0 AND is_adjustment = 0
     GROUP BY category_id
   `).all(profileId, month);
   const receivedMap = {};
@@ -176,7 +202,7 @@ function computeForMonths(profileId, months, rollover, categories) {
     const spentRows = db.prepare(`
       SELECT category_id, SUM(amount) as total
       FROM transactions
-      WHERE profile_id = ? AND substr(date,1,7) = ? AND is_transfer = 0
+      WHERE profile_id = ? AND substr(date,1,7) = ? AND is_transfer = 0 AND is_adjustment = 0
       GROUP BY category_id
     `).all(profileId, m);
     const spentMap = {};

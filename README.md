@@ -7,10 +7,12 @@ A personal budgeting app for private home use. Runs on your Synology NAS, access
 - Two-level categories: groups → subcategories with monthly targets
 - Income categories tracked separately (expected vs received, no rollover), shown at the top of the budget view
 - YNAB-style rollover for expense categories: unspent amounts carry forward each month
-- Transactions with manual entry and CSV import (ABN AMRO, ASN Bank)
+- Transactions with manual entry and CSV import (ABN AMRO `.txt`/`.tab`, ASN Bank `.csv`)
 - Budget-neutral transfers between accounts (both legs created atomically, excluded from budget)
+- Transfers can also be assigned directly during CSV import; if you later import the other side of the statement, the matching leg is detected and pre-deselected to avoid duplicates
 - Recurring transactions with configurable frequency: weekly, monthly, quarterly, or yearly
-- Category rules: map a keyword to a category so transactions are auto-categorised on entry and during CSV import
+- Rules: map a keyword to a category *or* to a transfer destination so transactions are auto-assigned on entry and during CSV import
+- Manual balance adjustments: post a dated, signed correction to an account when reality drifts from the ledger; excluded from budget/income totals
 - Per-month budget overview: target / spent / available per expense category
 - Account balances: set an initial balance per account; current balance updates automatically
 - Dark mode, works on desktop and mobile
@@ -163,8 +165,10 @@ That's it. Refresh your browser and you're on the new version.
 3. Select **ABN AMRO** as the bank.
 4. Select the account you are importing into.
 5. Choose the file you downloaded.
-6. Review the parsed transactions. You can assign a category to each one before importing.
+6. Review the parsed transactions. For each row, the **Toewijzing** dropdown lets you pick either a category or a transfer destination (under *Overboeking naar*). Picking a transfer destination creates both legs of the transfer in one go. Rows that already exist on the target account (e.g. because you previously imported the other side of a transfer) are flagged *(al geïmporteerd)* and pre-deselected.
 7. Click **Import**.
+
+Tip: set up rules in **Beheer → Categorieregels** so recurring items (a monthly transfer to savings, a credit-card auto-debit, your supermarket) are auto-assigned every import. A rule's target can be a category *or* an account — the latter turns matching rows into transfers automatically.
 
 ---
 

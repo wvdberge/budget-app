@@ -21,10 +21,11 @@ export const api = {
   },
 
   accounts: {
-    list:   (profileId)                          => req('GET',    `/api/accounts?profileId=${profileId}`),
-    create: (profileId, name, initial_balance)   => req('POST',   '/api/accounts', { profileId, name, initial_balance }),
-    update: (id, name, initial_balance)          => req('PUT',    `/api/accounts/${id}`, { name, initial_balance }),
-    delete: (id)                                 => req('DELETE', `/api/accounts/${id}`),
+    list:    (profileId)                         => req('GET',    `/api/accounts?profileId=${profileId}`),
+    balance: (id, date)                          => req('GET',    `/api/accounts/${id}/balance?date=${date}`),
+    create:  (profileId, name, initial_balance)  => req('POST',   '/api/accounts', { profileId, name, initial_balance }),
+    update:  (id, name, initial_balance)         => req('PUT',    `/api/accounts/${id}`, { name, initial_balance }),
+    delete:  (id)                                => req('DELETE', `/api/accounts/${id}`),
   },
 
   groups: {
@@ -55,9 +56,10 @@ export const api = {
       else if (month) url += `&month=${month}`;
       return req('GET', url);
     },
-    create: (t)                => req('POST',   '/api/transactions', t),
-    update: (id, t)            => req('PUT',    `/api/transactions/${id}`, t),
-    delete: (id)               => req('DELETE', `/api/transactions/${id}`),
+    create:     (t)             => req('POST',   '/api/transactions', t),
+    update:     (id, t)         => req('PUT',    `/api/transactions/${id}`, t),
+    delete:     (id)            => req('DELETE', `/api/transactions/${id}`),
+    adjustment: (t)             => req('POST',   '/api/transactions/adjustment', t),
   },
 
   transfers: {
@@ -65,10 +67,12 @@ export const api = {
   },
 
   import: {
-    parse: (bank, file) => {
+    parse: (bank, file, profileId, accountId) => {
       const form = new FormData();
       form.append('bank', bank);
       form.append('file', file);
+      if (profileId) form.append('profileId', profileId);
+      if (accountId) form.append('accountId', accountId);
       return req('POST', '/api/import/parse', form);
     },
     save: (profileId, accountId, transactions) =>
@@ -77,7 +81,7 @@ export const api = {
 
   rules: {
     list:   (profileId)                    => req('GET',    `/api/rules?profileId=${profileId}`),
-    create: (profileId, keyword, categoryId) => req('POST', '/api/rules', { profileId, keyword, categoryId }),
+    create: (profileId, keyword, target)   => req('POST',   '/api/rules', { profileId, keyword, ...target }),
     delete: (id)                           => req('DELETE', `/api/rules/${id}`),
   },
 };

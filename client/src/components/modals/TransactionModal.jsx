@@ -12,7 +12,8 @@ const FREQUENCIES = [
 function matchRule(rules, description) {
   if (!description || !rules?.length) return null;
   const lower = description.toLowerCase();
-  return rules.find(r => lower.includes(r.keyword.toLowerCase())) ?? null;
+  // Manual transactions only care about category rules; ignore transfer rules.
+  return rules.find(r => r.category_id && lower.includes(r.keyword.toLowerCase())) ?? null;
 }
 
 export default function TransactionModal({ tx, accounts, categories, rules, profileId, month, onClose, onSaved }) {

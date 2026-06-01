@@ -64,6 +64,29 @@ router.put('/:id', (req, res) => {
   res.json(db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id));
 });
 
+// POST /api/transactions/adjustment
+// Signed delta to bring an account balance to where it should be on a given date.
+// Excluded from budget/income totals.
+router.post('/adjustment', (req, res) => {
+  const { profileId, accountId, date, amount, description } = req.body;
+  if (!profileId || !accountId || !date || amount === undefined) {
+    return res.status(400).json({ error: 'profileId, accountId, date and amount required' });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+  const numeric = parseFloat(amount);
+  if (isNaN(numeric)) return res.status(400).json({ error: 'amount must be a number' });
+
+  const account = db.prepare('SELECT id FROM accounts WHERE id = ? AND profile_id = ?').get(accountId, profileId);
+  if (!account) return res.status(403).json({ error: 'account does not belong to profile' });
+
+  const info = db.prepare(`
+    INSERT INTO transactions (profile_id, account_id, category_id, date, amount, description, is_adjustment)
+    VALUES (?, ?, NULL, ?, ?, ?, 1)
+  `).run(profileId, accountId, date, numeric, description?.trim() || 'Saldo-aanpassing');
+
+  res.status(201).json(db.prepare('SELECT * FROM transactions WHERE id = ?').get(info.lastInsertRowid));
+});
+
 // DELETE /api/transactions/:id
 router.delete('/:id', (req, res) => {
   const tx = db.prepare('SELECT is_transfer, transfer_peer_id FROM transactions WHERE id = ?').get(req.params.id);

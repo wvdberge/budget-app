@@ -16,7 +16,7 @@ function parseAmount(str) {
 }
 
 function parseABNAMRO(text) {
-  // ABN AMRO TXT export: tab-separated, no header row
+  // ABN AMRO TXT/TAB export: tab-separated, no header row
   // Columns: Rekeningnummer, Munteenheid, Transactiedatum (YYYYMMDD),
   //          Beginsaldo, Eindsaldo, Rentedatum, Bedrag, Omschrijving
   const transactions = [];
@@ -94,48 +94,86 @@ function parseASNBank(text) {
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 // POST /api/import/parse
-// Parse a CSV file and return transactions (preview, not yet saved)
+// Parse a CSV/TAB file and return transactions (preview, not yet saved).
+// When profileId+accountId are provided, flag rows that already exist on the
+// target account (exact amount, ±1 day) so the UI can pre-deselect duplicates.
 router.post('/parse', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'file required' });
-  const { bank } = req.body;
+  const { bank, profileId, accountId } = req.body;
   if (!['abnamro', 'asn'].includes(bank)) return res.status(400).json({ error: 'bank must be abnamro or asn' });
 
   const text = req.file.buffer.toString('utf-8');
-  let transactions;
+  const transactions = bank === 'abnamro' ? parseABNAMRO(text) : parseASNBank(text);
 
-  if (bank === 'abnamro') {
-    transactions = parseABNAMRO(text);
-  } else {
-    transactions = parseASNBank(text);
+  if (profileId && accountId) {
+    const findMatch = db.prepare(`
+      SELECT id, is_transfer FROM transactions
+      WHERE profile_id = ?
+        AND account_id = ?
+        AND amount     = ?
+        AND date BETWEEN date(?, '-1 day') AND date(?, '+1 day')
+      LIMIT 1
+    `);
+    for (const t of transactions) {
+      const match = findMatch.get(profileId, accountId, t.amount, t.date, t.date);
+      if (match) t.existing = { id: match.id, isTransferLeg: !!match.is_transfer };
+    }
   }
 
   res.json({ transactions, count: transactions.length });
 });
 
 // POST /api/import/save
-// Save parsed transactions to the database
+// Save parsed transactions to the database.
+// Rows with `categoryId` become regular transactions.
+// Rows with `transferAccountId` create two linked transfer legs.
 router.post('/save', (req, res) => {
   const { profileId, accountId, transactions } = req.body;
   if (!profileId || !accountId || !Array.isArray(transactions)) {
     return res.status(400).json({ error: 'profileId, accountId and transactions required' });
   }
 
-  // Verify account belongs to profile
-  const account = db.prepare('SELECT id FROM accounts WHERE id = ? AND profile_id = ?').get(accountId, profileId);
+  const account = db.prepare('SELECT id, name FROM accounts WHERE id = ? AND profile_id = ?').get(accountId, profileId);
   if (!account) return res.status(403).json({ error: 'account does not belong to profile' });
 
-  const insert = db.prepare(`
+  const insertCategorized = db.prepare(`
     INSERT INTO transactions (profile_id, account_id, category_id, date, amount, description, is_recurring)
     VALUES (?, ?, ?, ?, ?, ?, 0)
   `);
+
+  const insertTransferLeg = db.prepare(`
+    INSERT INTO transactions (profile_id, account_id, date, amount, description, is_transfer)
+    VALUES (?, ?, ?, ?, ?, 1)
+  `);
+
+  const linkPeer = db.prepare('UPDATE transactions SET transfer_peer_id = ? WHERE id = ?');
+
+  const validAccount = db.prepare('SELECT name FROM accounts WHERE id = ? AND profile_id = ?');
 
   let saved = 0;
   const insertMany = db.transaction(() => {
     for (const t of transactions) {
       if (!t.date || t.amount === undefined) continue;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) continue;
-      insert.run(profileId, accountId, t.categoryId ?? null, t.date, t.amount, t.description ?? '');
-      saved++;
+
+      if (t.transferAccountId) {
+        if (Number(t.transferAccountId) === Number(accountId)) continue;
+        const peer = validAccount.get(t.transferAccountId, profileId);
+        if (!peer) continue;
+
+        const fromId = insertTransferLeg.run(
+          profileId, accountId, t.date, t.amount, t.description ?? ''
+        ).lastInsertRowid;
+        const toId = insertTransferLeg.run(
+          profileId, t.transferAccountId, t.date, -t.amount, `Overboeking van ${account.name}`
+        ).lastInsertRowid;
+        linkPeer.run(toId, fromId);
+        linkPeer.run(fromId, toId);
+        saved++;
+      } else {
+        insertCategorized.run(profileId, accountId, t.categoryId ?? null, t.date, t.amount, t.description ?? '');
+        saved++;
+      }
     }
   });
   insertMany();

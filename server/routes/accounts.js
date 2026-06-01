@@ -18,6 +18,24 @@ router.get('/', (req, res) => {
   res.json(rows);
 });
 
+// GET /api/accounts/:id/balance?date=YYYY-MM-DD
+// Balance on the given date = initial_balance + sum of transactions with date <= given date.
+router.get('/:id/balance', (req, res) => {
+  const { date } = req.query;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'date query param required (YYYY-MM-DD)' });
+  }
+  const row = db.prepare(`
+    SELECT a.initial_balance + COALESCE((
+      SELECT SUM(amount) FROM transactions WHERE account_id = a.id AND date <= ?
+    ), 0) AS balance
+    FROM accounts a
+    WHERE a.id = ?
+  `).get(date, req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  res.json({ balance: row.balance });
+});
+
 // POST /api/accounts
 router.post('/', (req, res) => {
   const { profileId, name, initial_balance } = req.body;

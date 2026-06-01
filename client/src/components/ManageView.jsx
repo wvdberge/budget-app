@@ -204,7 +204,9 @@ export default function ManageView() {
             <li key={r.id} className="manage-item">
               <span className="manage-item-name" style={{ fontFamily: 'monospace' }}>{r.keyword}</span>
               <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 4 }}>→</span>
-              <span style={{ fontSize: 13, marginLeft: 4 }}>{r.category_name}</span>
+              <span style={{ fontSize: 13, marginLeft: 4 }}>
+                {r.category_name ?? (r.transfer_account_name ? `↔ ${r.transfer_account_name}` : '—')}
+              </span>
               <button
                 className="icon-btn"
                 style={{ marginLeft: 'auto', color: 'var(--negative)' }}
@@ -214,10 +216,14 @@ export default function ManageView() {
             </li>
           ))}
         </ul>
-        <RuleAddForm categories={categories} onAdd={async (keyword, categoryId) => {
-          await api.rules.create(profileId, keyword, categoryId);
-          load();
-        }} />
+        <RuleAddForm
+          categories={categories}
+          accounts={accounts}
+          onAdd={async (keyword, target) => {
+            await api.rules.create(profileId, keyword, target);
+            load();
+          }}
+        />
       </div>
 
       {/* Category groups + categories — full width */}
@@ -337,17 +343,24 @@ function CategoryAddForm({ onAdd }) {
   );
 }
 
-function RuleAddForm({ categories, onAdd }) {
-  const [keyword, setKeyword]     = useState('');
-  const [categoryId, setCategoryId] = useState('');
+function RuleAddForm({ categories, accounts, onAdd }) {
+  const [keyword, setKeyword] = useState('');
+  const [kind, setKind]       = useState('category'); // 'category' | 'transfer'
+  const [targetId, setTargetId] = useState('');
 
   async function submit(e) {
     e.preventDefault();
-    if (!keyword.trim() || !categoryId) return;
-    await onAdd(keyword.trim(), Number(categoryId));
+    if (!keyword.trim() || !targetId) return;
+    const target = kind === 'category'
+      ? { categoryId:         Number(targetId) }
+      : { transferAccountId:  Number(targetId) };
+    await onAdd(keyword.trim(), target);
     setKeyword('');
-    setCategoryId('');
+    setTargetId('');
   }
+
+  const options = kind === 'category' ? categories : accounts;
+  const placeholder = kind === 'category' ? '— kies categorie —' : '— kies rekening —';
 
   return (
     <form onSubmit={submit} style={{ display: 'flex', gap: 6, marginTop: 8 }}>
@@ -357,9 +370,18 @@ function RuleAddForm({ categories, onAdd }) {
         placeholder="Zoekwoord (bijv. AH)"
         style={{ flex: 1 }}
       />
-      <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={{ flex: 1 }}>
-        <option value="">— kies categorie —</option>
-        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      <select
+        value={kind}
+        onChange={e => { setKind(e.target.value); setTargetId(''); }}
+        style={{ width: 110 }}
+        title="Regeltype"
+      >
+        <option value="category">Categorie</option>
+        <option value="transfer">Overboeking</option>
+      </select>
+      <select value={targetId} onChange={e => setTargetId(e.target.value)} style={{ flex: 1 }}>
+        <option value="">{placeholder}</option>
+        {options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
       </select>
       <button type="submit" className="btn btn-sm btn-primary">+</button>
     </form>

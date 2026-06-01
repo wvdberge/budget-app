@@ -5,6 +5,7 @@ import { formatAmount, formatDate } from '../format.js';
 import TransactionModal from './modals/TransactionModal.jsx';
 import ImportModal from './modals/ImportModal.jsx';
 import TransferModal from './modals/TransferModal.jsx';
+import AdjustmentModal from './modals/AdjustmentModal.jsx';
 
 export default function TransactionsView() {
   const { profileId, month } = useContext(AppContext);
@@ -16,6 +17,7 @@ export default function TransactionsView() {
   const [editTx, setEditTx]             = useState(null);   // null = closed, {} = new, tx = edit
   const [showImport, setShowImport]     = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
+  const [showAdjustment, setShowAdjustment] = useState(false);
   const [filterAccountId, setFilterAccountId] = useState('');
 
   function load() {
@@ -36,8 +38,10 @@ export default function TransactionsView() {
 
   useEffect(load, [profileId, month, filterAccountId]);
 
-  async function deleteTx(id, isTransfer) {
-    const msg = isTransfer ? 'Overboeking verwijderen? Beide boekingen worden verwijderd.' : 'Transactie verwijderen?';
+  async function deleteTx(id, isTransfer, isAdjustment) {
+    let msg = 'Transactie verwijderen?';
+    if (isTransfer) msg = 'Overboeking verwijderen? Beide boekingen worden verwijderd.';
+    else if (isAdjustment) msg = 'Saldo-aanpassing verwijderen?';
     if (!confirm(msg)) return;
     await api.transactions.delete(id);
     load();
@@ -52,6 +56,7 @@ export default function TransactionsView() {
       <div className="tx-toolbar">
         <button className="btn btn-primary btn-sm" onClick={() => setEditTx(filterAccountId ? { account_id: Number(filterAccountId) } : {})}>+ Transactie</button>
         <button className="btn btn-sm" onClick={() => setShowTransfer(true)}>↔ Overboeking</button>
+        <button className="btn btn-sm" onClick={() => setShowAdjustment(true)}>± Saldo aanpassen</button>
         <button className="btn btn-sm" onClick={() => setShowImport(true)}>CSV importeren</button>
         <select
           value={filterAccountId}
@@ -97,8 +102,9 @@ export default function TransactionsView() {
                 <td style={{ whiteSpace: 'nowrap' }}>{formatDate(tx.date)}</td>
                 <td>
                   {tx.description || <span style={{ color: 'var(--text-faint)' }}>—</span>}
-                  {tx.is_recurring ? <span className="recurring-badge">↻</span> : null}
-                  {tx.is_transfer  ? <span className="recurring-badge">↔</span> : null}
+                  {tx.is_recurring   ? <span className="recurring-badge">↻</span> : null}
+                  {tx.is_transfer    ? <span className="recurring-badge">↔</span> : null}
+                  {tx.is_adjustment  ? <span className="recurring-badge" title="Saldo-aanpassing">±</span> : null}
                 </td>
                 <td style={{ color: 'var(--text-muted)' }}>{tx.account_name}</td>
                 <td style={{ color: 'var(--text-muted)' }}>
@@ -108,8 +114,8 @@ export default function TransactionsView() {
                   {formatAmount(tx.amount)}
                 </td>
                 <td style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                  {!tx.is_transfer && <button className="icon-btn" title="Bewerken" onClick={() => setEditTx(tx)}>✎</button>}
-                  <button className="icon-btn" title="Verwijderen" onClick={() => deleteTx(tx.id, tx.is_transfer)}>✕</button>
+                  {!tx.is_transfer && !tx.is_adjustment && <button className="icon-btn" title="Bewerken" onClick={() => setEditTx(tx)}>✎</button>}
+                  <button className="icon-btn" title="Verwijderen" onClick={() => deleteTx(tx.id, tx.is_transfer, tx.is_adjustment)}>✕</button>
                 </td>
               </tr>
             ))}
@@ -147,6 +153,16 @@ export default function TransactionsView() {
           accounts={accounts}
           month={month}
           onClose={() => setShowTransfer(false)}
+          onSaved={load}
+        />
+      )}
+
+      {showAdjustment && (
+        <AdjustmentModal
+          profileId={profileId}
+          accounts={accounts}
+          defaultAccountId={filterAccountId ? Number(filterAccountId) : null}
+          onClose={() => setShowAdjustment(false)}
           onSaved={load}
         />
       )}
