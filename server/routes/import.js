@@ -53,27 +53,72 @@ function parseABNAMRO(text) {
   return transactions;
 }
 
-function parseASNBank(text) {
-  // ASN Bank CSV: semicolon-separated with header row, dates DD-MM-YYYY
-  // Columns: Boekingsdatum;Opdrachtgeversrekening;Tegenrekeningnummer;
-  //          Naam tegenrekening;...;Bedrag;...;Omschrijving;...
-  const transactions = [];
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  if (!lines.length) return transactions;
+// Single-quote-aware splitter for ASN's current CSV: commas inside '…' are kept.
+function splitAsnCsvLine(line) {
+  const out = [];
+  let cur = '', inQuote = false;
+  for (const ch of line) {
+    if (ch === "'") inQuote = !inQuote;
+    else if (ch === ',' && !inQuote) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
 
-  // Detect and skip header row
+function parseASNBank(text) {
+  // Auto-detect: legacy exports were semicolon-separated; current exports are comma-separated.
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  return lines[0].includes(';') ? parseASNBankLegacy(lines) : parseASNBankCurrent(lines);
+}
+
+function parseASNBankCurrent(lines) {
+  // ASN Bank CSV (2026 format): comma-separated, header row, single-quoted strings.
+  // Columns: Datum, Je rekening, Van / naar, Naam, Adres, Postcode, Woonplaats,
+  //          Valuta saldo, Saldo voor boeking, Valuta, Bedrag bij / af,
+  //          Verwerkingsdatum, Valutadatum, Code, Type, Volgnummer,
+  //          Betalingskenmerk, Omschrijving, Afschriftnummer, Categorie
+  // Dates DD-MM-YYYY; amounts US-style decimal point (e.g. "-6.02").
+  const transactions = [];
+  const isHeader = lines[0].toLowerCase().startsWith('datum,');
+  const dataLines = isHeader ? lines.slice(1) : lines;
+
+  for (const line of dataLines) {
+    const cols = splitAsnCsvLine(line);
+    if (cols.length < 18) continue;
+
+    const dateParts = cols[0].trim().split('-');
+    if (dateParts.length !== 3) continue;
+    const date = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+
+    const amount = parseFloat(cols[10].trim());
+    if (isNaN(amount)) continue;
+
+    const counterparty = cols[3]?.trim();
+    const rawDesc      = cols[17]?.trim();
+    const description  = [counterparty, rawDesc].filter(Boolean).join(' — ').slice(0, 200);
+
+    transactions.push({ date, amount, description: description || 'Import ASN Bank' });
+  }
+
+  return transactions;
+}
+
+function parseASNBankLegacy(lines) {
+  // Pre-2026 ASN Bank CSV: semicolon-separated with header row, dates DD-MM-YYYY,
+  // amounts Dutch-format. Kept so older exports still import.
+  const transactions = [];
   const firstLine = lines[0].replace(/"/g, '');
   const isHeader = firstLine.toLowerCase().includes('boekingsdatum');
   const dataLines = isHeader ? lines.slice(1) : lines;
 
   for (const line of dataLines) {
-    // Handle quoted fields
     const cols = line.split(';').map(c => c.replace(/^"|"$/g, '').trim());
     if (cols.length < 18) continue;
 
-    // Boekingsdatum: DD-MM-YYYY
-    const rawDate = cols[0];
-    const dateParts = rawDate.split('-');
+    const dateParts = cols[0].split('-');
     if (dateParts.length !== 3) continue;
     const date = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
