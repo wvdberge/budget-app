@@ -85,7 +85,7 @@ export default function ImportModal({ profileId, accounts, categories, rules, on
             </div>
             <div className="form-row">
               <label>CSV-bestand</label>
-              <input type="file" ref={fileRef} accept=".csv,.txt" style={{ padding: '4px 0' }} />
+              <input type="file" ref={fileRef} accept=".csv,.txt,.tab" style={{ padding: '4px 0' }} />
             </div>
             {error && <div className="error-msg">{error}</div>}
             <div className="modal-footer">
