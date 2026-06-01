@@ -94,17 +94,19 @@ router.post('/:profileId/:month/apply-recurring', (req, res) => {
       const anchorMonthStr = anchor.date.slice(0, 7);
       const diff = calcMonthDiff(anchorMonthStr, month);
 
-      // Never apply for months before or equal to the anchor's own month
-      if (diff <= 0) continue;
+      // Skip months before the anchor's own month for every frequency.
+      if (diff < 0) continue;
 
       if (freq === 'weekly') {
-        // Create one copy per matching weekday within the target month
+        // Fill matching weekdays in the target month. When diff === 0 (the anchor's own
+        // month) the anchor itself already occupies its date — skip it in the loop.
         const anchorWeekday = new Date(anchor.date).getDay();
         const daysInMonth = new Date(targetYear, targetMonthNum, 0).getDate();
 
         for (let d = 1; d <= daysInMonth; d++) {
           if (new Date(targetYear, targetMonthNum - 1, d).getDay() !== anchorWeekday) continue;
           const dateStr = `${month}-${String(d).padStart(2, '0')}`;
+          if (dateStr === anchor.date) continue;
 
           const exists = db.prepare(`
             SELECT 1 FROM transactions WHERE profile_id = ? AND date = ? AND recurring_anchor_id = ?
@@ -115,7 +117,9 @@ router.post('/:profileId/:month/apply-recurring', (req, res) => {
           created++;
         }
       } else {
-        // monthly: every month (period=1), quarterly: every 3, yearly: every 12
+        // monthly: every month (period=1), quarterly: every 3, yearly: every 12.
+        // The anchor row covers its own month, so skip diff === 0 here.
+        if (diff === 0) continue;
         const period = freq === 'quarterly' ? 3 : freq === 'yearly' ? 12 : 1;
         if (diff % period !== 0) continue;
 
