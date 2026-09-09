@@ -50,10 +50,11 @@ export const api = {
   },
 
   transactions: {
-    list:   (profileId, month, accountId) => {
+    list:   (profileId, month, accountId, categoryId) => {
       let url = `/api/transactions?profileId=${profileId}`;
       if (accountId) url += `&accountId=${accountId}`;
       else if (month) url += `&month=${month}`;
+      if (categoryId) url += `&categoryId=${categoryId}`;
       return req('GET', url);
     },
     create:     (t)             => req('POST',   '/api/transactions', t),

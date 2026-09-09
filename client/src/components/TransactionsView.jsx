@@ -8,7 +8,7 @@ import TransferModal from './modals/TransferModal.jsx';
 import AdjustmentModal from './modals/AdjustmentModal.jsx';
 
 export default function TransactionsView() {
-  const { profileId, month } = useContext(AppContext);
+  const { profileId, month, categoryFilter, setCategoryFilter } = useContext(AppContext);
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts]         = useState([]);
   const [categories, setCategories]     = useState([]);
@@ -24,7 +24,7 @@ export default function TransactionsView() {
     if (!profileId) return;
     setLoading(true);
     Promise.all([
-      api.transactions.list(profileId, month, filterAccountId || null),
+      api.transactions.list(profileId, month, filterAccountId || null, categoryFilter || null),
       api.accounts.list(profileId),
       api.categories.list(profileId),
       api.rules.list(profileId),
@@ -36,7 +36,7 @@ export default function TransactionsView() {
     }).finally(() => setLoading(false));
   }
 
-  useEffect(load, [profileId, month, filterAccountId]);
+  useEffect(load, [profileId, month, filterAccountId, categoryFilter]);
 
   async function deleteTx(id, isTransfer, isAdjustment) {
     let msg = 'Transactie verwijderen?';
@@ -66,9 +66,18 @@ export default function TransactionsView() {
           <option value="">Alle rekeningen</option>
           {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
+        <select
+          value={categoryFilter}
+          onChange={e => setCategoryFilter(e.target.value)}
+          style={{ fontSize: 13 }}
+        >
+          <option value="">Alle categorieën</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
         <span className="spacer" />
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
           {transactions.length} transactie{transactions.length !== 1 ? 's' : ''}
+          {transactions.length > 0 && ` · ${formatAmount(transactions.reduce((s, t) => s + t.amount, 0))}`}
         </span>
       </div>
 

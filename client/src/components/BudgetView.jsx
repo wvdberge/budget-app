@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { formatAmount, availableClass } from '../format.js';
 
 export default function BudgetView() {
-  const { profileId, month } = useContext(AppContext);
+  const { profileId, month, setCategoryFilter, setTab } = useContext(AppContext);
   const [budget, setBudget] = useState(null);
   const [loading, setLoading]   = useState(false);
   const [editingTarget, setEditingTarget] = useState(null); // { categoryId, value }
@@ -55,6 +55,11 @@ export default function BudgetView() {
     setEditingTarget(null);
   }
 
+  function showCategoryTransactions(categoryId) {
+    setCategoryFilter(String(categoryId));
+    setTab('transactions');
+  }
+
   if (loading) return <div className="empty-state">Laden…</div>;
   if (!budget) return null;
 
@@ -92,7 +97,15 @@ export default function BudgetView() {
               const diff = ic.received - ic.target;
               return (
                 <tr key={ic.id} className="budget-row">
-                  <td className="name">{ic.name}</td>
+                  <td className="name">
+                    <span
+                      style={{ cursor: 'pointer' }}
+                      title="Toon transacties"
+                      onClick={() => showCategoryTransactions(ic.id)}
+                    >
+                      {ic.name}
+                    </span>
+                  </td>
                   <td className="amount">{formatAmount(ic.target)}</td>
                   <td className="amount">{formatAmount(ic.received)}</td>
                   <td className="amount available-cell">
@@ -126,7 +139,15 @@ export default function BudgetView() {
                   </tr>
                   {group.categories.map(cat => (
                     <tr key={cat.id} className="budget-row">
-                      <td className="name">{cat.name}</td>
+                      <td className="name">
+                        <span
+                          style={{ cursor: 'pointer' }}
+                          title="Toon transacties"
+                          onClick={() => showCategoryTransactions(cat.id)}
+                        >
+                          {cat.name}
+                        </span>
+                      </td>
                       <td className="amount">
                         {editingTarget?.categoryId === cat.id ? (
                           <input

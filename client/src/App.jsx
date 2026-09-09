@@ -13,6 +13,7 @@ export default function App() {
   const [profileId, setProfileId] = useState(null);
   const [month, setMonth]         = useState(currentMonth());
   const [tab, setTab]             = useState('budget'); // 'budget' | 'transactions' | 'manage'
+  const [categoryFilter, setCategoryFilter] = useState(''); // '' = all; set by clicking a budget category
 
   useEffect(() => {
     api.profiles.list().then(list => {
@@ -20,6 +21,9 @@ export default function App() {
       if (list.length > 0 && !profileId) setProfileId(list[0].id);
     });
   }, []);
+
+  // Category ids are profile-scoped, so a filter from one profile is meaningless in another.
+  useEffect(() => { setCategoryFilter(''); }, [profileId]);
 
   function reloadProfiles() {
     api.profiles.list().then(list => {
@@ -30,7 +34,7 @@ export default function App() {
     });
   }
 
-  const ctx = { profileId, setProfileId, profiles, reloadProfiles, month, setMonth };
+  const ctx = { profileId, setProfileId, profiles, reloadProfiles, month, setMonth, tab, setTab, categoryFilter, setCategoryFilter };
 
   return (
     <AppContext.Provider value={ctx}>
