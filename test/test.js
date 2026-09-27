@@ -140,6 +140,34 @@ async function run() {
   r = await req('POST', `/api/budget/${profileId}/2026-02/apply-recurring`);
   assert('apply-recurring is idempotent (0 on second call)', r.status === 200 && r.data.created === 0, r.data);
 
+  // ── Overview ──────────────────────────────────────────────────────────────
+  console.log('\nOverview');
+
+  r = await req('POST', '/api/categories', { profileId, groupId, name: 'Salaris', is_income: true });
+  const incomeCategoryId = r.data.id;
+  await req('POST', '/api/transactions', { profileId, accountId, categoryId: incomeCategoryId, date: '2026-02-25', amount: 1000 });
+  await req('POST', '/api/transactions', { profileId, accountId, categoryId, date: '2026-02-10', amount: 30, description: 'Terugbetaling' });
+  await req('POST', '/api/transactions', { profileId, accountId, date: '2026-02-12', amount: -20, description: 'Onbekend' });
+
+  r = await req('GET', `/api/overview?profileId=${profileId}&from=2025-11&to=2026-02`);
+  assert('GET /api/overview returns groups', r.status === 200 && Array.isArray(r.data.groups), r.data);
+  assert('Overview clamps from to the first month with data', r.data.from === '2026-01' && r.data.to === '2026-02', r.data);
+  const huur = r.data.groups.flatMap(g => g.categories).find(c => c.id === categoryId);
+  // Jan: 250 + 50 Netflix; Feb: 50 recurring Netflix − 30 refund
+  assert('Overview spending is net per month', huur && Math.abs(huur.months['2026-01'] - 300) < 0.01 && Math.abs(huur.months['2026-02'] - 20) < 0.01, huur);
+  assert('Overview leaves income categories out of groups', !r.data.groups.flatMap(g => g.categories).some(c => c.id === incomeCategoryId), r.data.groups);
+  assert('Overview sums income per month', Math.abs((r.data.income['2026-02'] ?? 0) - 1000) < 0.01, r.data.income);
+  assert('Overview reports uncategorized separately', r.data.uncategorized.count === 1 && Math.abs(r.data.uncategorized.months['2026-02'] - 20) < 0.01, r.data.uncategorized);
+
+  r = await req('GET', `/api/overview?profileId=${profileId}&from=2026-03&to=2026-02`);
+  assert('Overview with from after to returns 400', r.status === 400, r.data);
+
+  r = await req('GET', `/api/transactions?profileId=${profileId}&from=2026-01&to=2026-02&categoryId=${categoryId}`);
+  assert('Transactions filter by period', Array.isArray(r.data) && r.data.length === 4, r.data);
+
+  r = await req('GET', `/api/transactions?profileId=${profileId}&from=2026-01&to=2026-02&categoryId=none`);
+  assert('Transactions filter on uncategorized', Array.isArray(r.data) && r.data.length === 1 && r.data[0].category_id === null, r.data);
+
   // ── Error cases ───────────────────────────────────────────────────────────
   console.log('\nError cases');
 

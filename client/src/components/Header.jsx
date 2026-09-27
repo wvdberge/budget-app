@@ -4,7 +4,7 @@ import { formatMonth, addMonths } from '../format.js';
 import { api } from '../api.js';
 
 export default function Header({ tab, setTab }) {
-  const { profiles, profileId, setProfileId, reloadProfiles, month, setMonth } = useContext(AppContext);
+  const { profiles, profileId, setProfileId, reloadProfiles, month, setMonth, txPeriod } = useContext(AppContext);
   const [addingProfile, setAddingProfile] = useState(false);
   const [newProfileName, setNewProfileName] = useState('');
 
@@ -54,8 +54,8 @@ export default function Header({ tab, setTab }) {
 
       <span className="spacer" />
 
-      {/* Month navigation — only on budget and transactions tabs */}
-      {(tab === 'budget' || tab === 'transactions') && (
+      {/* Month navigation — only on budget and transactions tabs, unless Transacties shows an overview period */}
+      {(tab === 'budget' || (tab === 'transactions' && !txPeriod)) && (
         <div className="month-nav">
           <button className="icon-btn" onClick={() => setMonth(m => addMonths(m, -1))}>‹</button>
           <span className="month-label">{formatMonth(month)}</span>
@@ -65,7 +65,7 @@ export default function Header({ tab, setTab }) {
 
       {/* Tabs */}
       <nav style={{ display: 'flex', gap: 2, marginLeft: 12 }}>
-        {[['budget', 'Budget'], ['transactions', 'Transacties'], ['manage', 'Beheer']].map(([key, label]) => (
+        {[['budget', 'Budget'], ['overview', 'Overzicht'], ['transactions', 'Transacties'], ['manage', 'Beheer']].map(([key, label]) => (
           <button
             key={key}
             className={`tab ${tab === key ? 'active' : ''}`}

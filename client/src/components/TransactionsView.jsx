@@ -1,14 +1,14 @@
 import { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../App.jsx';
 import { api } from '../api.js';
-import { formatAmount, formatDate } from '../format.js';
+import { formatAmount, formatDate, formatMonth } from '../format.js';
 import TransactionModal from './modals/TransactionModal.jsx';
 import ImportModal from './modals/ImportModal.jsx';
 import TransferModal from './modals/TransferModal.jsx';
 import AdjustmentModal from './modals/AdjustmentModal.jsx';
 
 export default function TransactionsView() {
-  const { profileId, month, categoryFilter, setCategoryFilter } = useContext(AppContext);
+  const { profileId, month, categoryFilter, setCategoryFilter, txPeriod, setTxPeriod } = useContext(AppContext);
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts]         = useState([]);
   const [categories, setCategories]     = useState([]);
@@ -24,7 +24,7 @@ export default function TransactionsView() {
     if (!profileId) return;
     setLoading(true);
     Promise.all([
-      api.transactions.list(profileId, month, filterAccountId || null, categoryFilter || null),
+      api.transactions.list(profileId, month, filterAccountId || null, categoryFilter || null, txPeriod),
       api.accounts.list(profileId),
       api.categories.list(profileId),
       api.rules.list(profileId),
@@ -36,7 +36,7 @@ export default function TransactionsView() {
     }).finally(() => setLoading(false));
   }
 
-  useEffect(load, [profileId, month, filterAccountId, categoryFilter]);
+  useEffect(load, [profileId, month, filterAccountId, categoryFilter, txPeriod]);
 
   async function deleteTx(id, isTransfer, isAdjustment) {
     let msg = 'Transactie verwijderen?';
@@ -72,6 +72,7 @@ export default function TransactionsView() {
           style={{ fontSize: 13 }}
         >
           <option value="">Alle categorieën</option>
+          <option value="none">Niet gecategoriseerd</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <span className="spacer" />
@@ -80,6 +81,13 @@ export default function TransactionsView() {
           {transactions.length > 0 && ` · ${formatAmount(transactions.reduce((s, t) => s + t.amount, 0))}`}
         </span>
       </div>
+
+      {txPeriod && !selectedAccount && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', marginBottom: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+          <span>Periode: {formatMonth(txPeriod.from)} – {formatMonth(txPeriod.to)}</span>
+          <button className="icon-btn" title="Terug naar maandweergave" onClick={() => setTxPeriod(null)}>✕</button>
+        </div>
+      )}
 
       {selectedAccount && (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '10px 4px', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
@@ -92,7 +100,7 @@ export default function TransactionsView() {
       )}
 
       {transactions.length === 0 ? (
-        <div className="empty-state">Geen transacties in deze maand.</div>
+        <div className="empty-state">Geen transacties in {txPeriod ? 'deze periode' : 'deze maand'}.</div>
       ) : (
         <table className="tx-table">
           <thead>

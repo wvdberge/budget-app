@@ -34,12 +34,12 @@ Two-process app: an Express server (`server/`) serving a REST API and the React 
 **Server (`server/`)**
 - `db.js` — single SQLite database via `better-sqlite3`. Contains the full schema, all migrations (as `ALTER TABLE` try/catch blocks at the top), and the rollover budget computation logic (`computeBudget`). Any schema changes go here.
 - `index.js` — mounts all routes
-- `routes/` — one file per resource: `profiles`, `accounts`, `groups`, `categories`, `budget`, `transactions`, `transfers`, `import`
+- `routes/` — one file per resource: `profiles`, `accounts`, `groups`, `categories`, `budget`, `transactions`, `transfers`, `import`, `rules`, `overview`
 
 **Client (`client/src/`)**
 - `App.jsx` — root component, holds global state (`profileId`, `month`) in `AppContext`, fetches profiles
 - `api.js` — all HTTP calls in one place; all other components import from here
-- `components/` — three top-level views (`BudgetView`, `TransactionsView`, `ManageView`) plus `modals/`
+- `components/` — four top-level views (`BudgetView`, `OverviewView` + its SVG `OverviewChart`, `TransactionsView`, `ManageView`) plus `modals/`
 
 **Key data model relationships:**
 - Everything is scoped to a `profile_id`

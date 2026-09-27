@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { formatAmount, availableClass } from '../format.js';
 
 export default function BudgetView() {
-  const { profileId, month, setCategoryFilter, setTab } = useContext(AppContext);
+  const { profileId, month, setCategoryFilter, setTab, setTxPeriod } = useContext(AppContext);
   const [budget, setBudget] = useState(null);
   const [loading, setLoading]   = useState(false);
   const [editingTarget, setEditingTarget] = useState(null); // { categoryId, value }
@@ -57,6 +57,7 @@ export default function BudgetView() {
 
   function showCategoryTransactions(categoryId) {
     setCategoryFilter(String(categoryId));
+    setTxPeriod(null);
     setTab('transactions');
   }
 

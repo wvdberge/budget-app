@@ -50,9 +50,10 @@ export const api = {
   },
 
   transactions: {
-    list:   (profileId, month, accountId, categoryId) => {
+    list:   (profileId, month, accountId, categoryId, period) => {
       let url = `/api/transactions?profileId=${profileId}`;
       if (accountId) url += `&accountId=${accountId}`;
+      else if (period) url += `&from=${period.from}&to=${period.to}`;
       else if (month) url += `&month=${month}`;
       if (categoryId) url += `&categoryId=${categoryId}`;
       return req('GET', url);
@@ -78,6 +79,10 @@ export const api = {
     },
     save: (profileId, accountId, transactions) =>
       req('POST', '/api/import/save', { profileId, accountId, transactions }),
+  },
+
+  overview: {
+    get: (profileId, from, to) => req('GET', `/api/overview?profileId=${profileId}${from ? `&from=${from}` : ''}${to ? `&to=${to}` : ''}`),
   },
 
   rules: {

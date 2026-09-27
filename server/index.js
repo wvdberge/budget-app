@@ -18,6 +18,7 @@ app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/transfers',    require('./routes/transfers'));
 app.use('/api/import',       require('./routes/import'));
 app.use('/api/rules',        require('./routes/rules'));
+app.use('/api/overview',     require('./routes/overview'));
 
 // SPA fallback
 app.get('*', (req, res) => {

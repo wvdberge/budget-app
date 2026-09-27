@@ -2,11 +2,13 @@ const express = require('express');
 const { db } = require('../db');
 const router = express.Router();
 
-// GET /api/transactions?profileId=&month=YYYY-MM&accountId=&categoryId=
-// accountId takes precedence over month; when accountId is set, all months are returned.
-// categoryId is additive: it combines with whichever of account/month applies.
+// GET /api/transactions?profileId=&month=YYYY-MM&from=YYYY-MM&to=YYYY-MM&accountId=&categoryId=
+// accountId takes precedence over from/to, which take precedence over month;
+// when accountId is set, all months are returned.
+// categoryId is additive: it combines with whichever of account/period/month applies.
+// categoryId=none selects uncategorized spending (no transfers or adjustments).
 router.get('/', (req, res) => {
-  const { profileId, month, accountId, categoryId } = req.query;
+  const { profileId, month, from, to, accountId, categoryId } = req.query;
   if (!profileId) return res.status(400).json({ error: 'profileId required' });
 
   let q = `
@@ -21,13 +23,19 @@ router.get('/', (req, res) => {
   if (accountId) {
     q += ' AND t.account_id = ?';
     params.push(accountId);
+  } else if (from && to) {
+    if (!/^\d{4}-\d{2}$/.test(from) || !/^\d{4}-\d{2}$/.test(to)) return res.status(400).json({ error: 'from and to must be YYYY-MM' });
+    q += ' AND substr(t.date,1,7) BETWEEN ? AND ?';
+    params.push(from, to);
   } else if (month) {
     if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
     q += ' AND substr(t.date,1,7) = ?';
     params.push(month);
   }
 
-  if (categoryId) {
+  if (categoryId === 'none') {
+    q += ' AND t.category_id IS NULL AND t.is_transfer = 0 AND t.is_adjustment = 0';
+  } else if (categoryId) {
     q += ' AND t.category_id = ?';
     params.push(categoryId);
   }
