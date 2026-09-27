@@ -14,8 +14,9 @@ A personal budgeting app for private home use. Runs on your Synology NAS, access
 - Rules: map a keyword to a category *or* to a transfer destination so transactions are auto-assigned on entry and during CSV import
 - Manual balance adjustments: post a dated, signed correction to an account when reality drifts from the ledger; excluded from budget/income totals
 - Per-month budget overview: target / spent / available per expense category
+- Spending overview (Overzicht) over any range of months: totals, monthly averages and shares per group and category, with a monthly chart
 - Account balances: set an initial balance per account; current balance updates automatically
-- Dark mode, works on desktop and mobile
+- Dark mode, works on desktop and mobile (the Overzicht tab is laid out for desktop)
 
 **Not included:** login, authentication, cloud sync — this is a private LAN-only app.
 
@@ -23,14 +24,14 @@ A personal budgeting app for private home use. Runs on your Synology NAS, access
 
 ## Running locally (development)
 
-Requirements: Node.js 20+, npm.
+Requirements: Node.js 20–24, npm. Node 26 has no prebuilt `better-sqlite3` binary; without Xcode command-line tools to compile one, run the server with `npx -y node@24 index.js` instead.
 
 ```bash
 # Install dependencies for server and client
 cd server && npm install && cd ..
 cd client && npm install && cd ..
 
-# Start server (port 3001)
+# Start server (port 3000)
 cd server && node index.js
 
 # In a separate terminal: start the dev server (port 5173)
@@ -144,6 +145,18 @@ sudo docker compose up -d --build
 ```
 
 That's it. Refresh your browser and you're on the new version.
+
+---
+
+## Spending overview (Overzicht)
+
+The **Overzicht** tab shows where money went over a period of whole months. It is read-only and covers the profile selected in the header.
+
+- **Period:** pick *Dit jaar*, the last 3, 6 or 12 months, *Alles*, or a custom range (*Aangepast*). By default the current month is left out, because a half-finished month lowers the averages; tick *incl. huidige maand* to add it. A period never starts before the first month with data.
+- **Table:** each group with a subtotal and its categories underneath, showing the total, monthly average and share of all spending. Click ▾ to fold a group. Click the *Totaal* header to list all categories sorted by amount. Below the table: total income and the net result (income minus spending).
+- **What counts as spending:** the same net amount the budget uses. Refunds and reimbursements booked in a category lower its spending; transfers and balance adjustments are left out. Uncategorized transactions get their own row at the bottom and are not in the totals.
+- **Chart:** monthly spending stacked by group; hover a month for the amounts. Click a row in the table to chart only that group or category, with a dashed line at its average. Click *Alles* to go back.
+- **Transactions:** the ↗ at the end of a row opens Transacties with that category and period. Click ✕ on the period banner there to return to the normal month view.
 
 ---
 
