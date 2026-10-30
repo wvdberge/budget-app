@@ -18,7 +18,7 @@ node test/test.js
 
 **Deploy on NAS:**
 
-The app runs on the NAS via Dockge (port 5002), pulling `ghcr.io/wvdberge/budget-app:latest`. GitHub Actions builds the full Docker image (including client) and pushes to GHCR on every push to `main`.
+The app runs on the NAS via Dockge (container port 3000 → `http://192.168.1.202:3000`, API at `/api`), pulling `ghcr.io/wvdberge/budget-app:latest`. GitHub Actions builds the full Docker image (including client) and pushes to GHCR on every push to `main`.
 
 Deploy workflow:
 1. Commit and push changes
