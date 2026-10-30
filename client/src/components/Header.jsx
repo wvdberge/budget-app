@@ -3,6 +3,22 @@ import { AppContext } from '../App.jsx';
 import { formatMonth, addMonths } from '../format.js';
 import { api } from '../api.js';
 
+function ThemeToggle() {
+  const [light, setLight] = useState(document.documentElement.dataset.theme === 'light');
+  function toggle() {
+    const next = !light;
+    setLight(next);
+    if (next) document.documentElement.dataset.theme = 'light';
+    else delete document.documentElement.dataset.theme;
+    try { localStorage.setItem('theme', next ? 'light' : 'dark'); } catch { /* applies this session only */ }
+  }
+  return (
+    <button className="btn btn-sm theme-toggle" onClick={toggle} title="Thema wisselen">
+      {light ? '☾ Donker' : '☀ Licht'}
+    </button>
+  );
+}
+
 export default function Header({ tab, setTab }) {
   const { profiles, profileId, setProfileId, reloadProfiles, month, setMonth, txPeriod } = useContext(AppContext);
   const [addingProfile, setAddingProfile] = useState(false);
@@ -73,6 +89,8 @@ export default function Header({ tab, setTab }) {
           >{label}</button>
         ))}
       </nav>
+
+      <ThemeToggle />
     </header>
   );
 }
